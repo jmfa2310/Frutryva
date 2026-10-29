@@ -1,0 +1,1 @@
+# FUTRYVA admin — implementação futura

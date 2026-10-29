@@ -1,0 +1,1 @@
+# FUTRYVA club — implementação futura

@@ -1,0 +1,79 @@
+name: Backend
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: backend/go.sum
+      - name: Create ephemeral database credential
+        shell: bash
+        run: |
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          echo "POSTGRES_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "PGPASSWORD=$password" >> "$GITHUB_ENV"
+          echo "DATABASE_TEST_URL=postgres://futryva:$password@127.0.0.1:5432/futryva_test?sslmode=disable" >> "$GITHUB_ENV"
+      - name: Start isolated PostgreSQL
+        run: |
+          docker run -d --name futryva-ci-db \
+            -e POSTGRES_USER=futryva -e POSTGRES_DB=futryva_test -e POSTGRES_PASSWORD \
+            -p 127.0.0.1:5432:5432 \
+            --health-cmd='pg_isready -U futryva -d futryva_test' \
+            --health-interval=2s --health-retries=30 postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' futryva-ci-db)" = healthy ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs futryva-ci-db
+          exit 1
+      - name: Check, test and build
+        run: |
+          test -z "$(gofmt -l .)"
+          go mod download
+          go vet ./...
+          go test -race -count=1 -v ./...
+          go build -o "$RUNNER_TEMP/futryva" .
+      - name: Smoke API with PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGDATABASE: futryva_test
+          PGUSER: futryva
+          PGSSLMODE: disable
+          HOST: 127.0.0.1
+          PORT: '8080'
+          MIGRATIONS_DIR: ../database
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/futryva" > "$RUNNER_TEMP/futryva-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then
+              python3 ../scripts/smoke.py
+              exit $?
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/futryva-api.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/futryva-api.log"
+          exit 1

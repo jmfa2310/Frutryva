@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: FUTRYVA API — fundação
+  version: 0.1.0
+  description: Apenas endpoints existentes. Autenticação e gestão de clubes são trabalho futuro.
+paths:
+  /:
+    get:
+      operationId: getService
+      summary: Identificação da API
+      responses:
+        '200':
+          description: Metadados da fundação técnica
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, stage, sports, health]
+                properties:
+                  name: {type: string, const: FUTRYVA}
+                  stage: {type: string, const: initial foundation}
+                  sports: {type: string, const: GET /v1/sports}
+                  health: {type: string, const: GET /health}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+  /health:
+    get:
+      operationId: getReadiness
+      summary: Disponibilidade da base e do esquema necessário
+      responses:
+        '200':
+          description: API e dependências disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service]
+                properties:
+                  status: {type: string, const: ok}
+                  service: {type: string, const: FUTRYVA API}
+        '503':
+          description: Base de dados ou esquema indisponível
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+  /v1/sports:
+    get:
+      operationId: listSportVariants
+      summary: Catálogo das modalidades e variantes
+      responses:
+        '200':
+          description: Variantes ordenadas pela ordem do catálogo; array vazio se não houver registos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/SportVariant'}
+        '500':
+          description: Falha ao consultar o catálogo
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+components:
+  responses:
+    MethodNotAllowed:
+      description: Método não permitido; GET e HEAD são suportados
+      headers:
+        Allow:
+          schema: {type: string, const: 'GET, HEAD'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    SportVariant:
+      type: object
+      required: [sportCode, sport, variant, playersOnField]
+      properties:
+        sportCode: {type: string, examples: [futsal]}
+        sport: {type: string, examples: [Futsal]}
+        variant: {type: string, examples: [Futsal]}
+        playersOnField: {type: integer, minimum: 1, examples: [5]}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}

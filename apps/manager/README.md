@@ -1,0 +1,1 @@
+# FUTRYVA manager — implementação futura

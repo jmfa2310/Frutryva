@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: futryva
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no ficheiro .env}
+      POSTGRES_DB: futryva
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U futryva -d futryva"]
+      interval: 5s
+      retries: 12
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PGHOST: db
+      PGPORT: '5432'
+      PGUSER: futryva
+      PGDATABASE: futryva
+      PGPASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no ficheiro .env}
+      PGSSLMODE: disable
+      MIGRATIONS_DIR: /app/database
+      PORT: '8080'
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/futryva", "healthcheck"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 5s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  postgres_data:
