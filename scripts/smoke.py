@@ -5,12 +5,12 @@ import sys
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-base = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8080").rstrip("/")
+base = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:18080").rstrip("/")
 
 
 def request(path, status=200, method="GET"):
     try:
-        response = urlopen(Request(base + path, method=method), timeout=5)
+        response = urlopen(Request(base + path, method=method, headers={"Content-Type": "application/json"}), timeout=5)
     except HTTPError as error:
         response = error
     with response:

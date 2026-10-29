@@ -65,6 +65,11 @@ func baseline(t *testing.T) []byte {
 	return data
 }
 
+func baselineOnly(t *testing.T) string {
+	t.Helper()
+	return tempMigrations(t, map[string][]byte{"001_init.sql": baseline(t)})
+}
+
 func tempMigrations(t *testing.T, files map[string][]byte) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -99,7 +104,7 @@ func TestAdoptsLegacySchemaAndPreservesData(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		if err := Apply(ctx, db, sourceDir); err != nil {
+		if err := Apply(ctx, db, baselineOnly(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -126,7 +131,7 @@ func TestAdoptsLegacySchemaAndPreservesData(t *testing.T) {
 func TestMigrationRollbackAndImmutableHistory(t *testing.T) {
 	ctx, db := testPool(t)
 	data := baseline(t)
-	if err := Apply(ctx, db, sourceDir); err != nil {
+	if err := Apply(ctx, db, baselineOnly(t)); err != nil {
 		t.Fatal(err)
 	}
 	t.Run("failed migration rolls back DDL and ledger", func(t *testing.T) {
@@ -173,7 +178,7 @@ func TestConcurrentRunnersApplyOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs <- Apply(ctx, db, sourceDir)
+			errs <- Apply(ctx, db, baselineOnly(t))
 		}()
 	}
 	wg.Wait()
@@ -195,7 +200,7 @@ func TestConcurrentRunnersApplyOnce(t *testing.T) {
 // HTTP authorization tests must be added when authenticated routes exist.
 func TestCompositeForeignKeysRejectCrossClubRoster(t *testing.T) {
 	ctx, db := testPool(t)
-	if err := Apply(ctx, db, sourceDir); err != nil {
+	if err := Apply(ctx, db, baselineOnly(t)); err != nil {
 		t.Fatal(err)
 	}
 	const clubA = "a0000000-0000-4000-8000-000000000001"
@@ -229,5 +234,29 @@ func TestCompositeForeignKeysRejectCrossClubRoster(t *testing.T) {
 	if _, err := db.Exec(ctx, `INSERT INTO team_players(club_id,team_id,player_id)
 		VALUES($1,$2,'c0000000-0000-4000-8000-000000000001')`, clubA, teamA); err != nil {
 		t.Fatal("valid same-club roster rejected:", err)
+	}
+}
+
+func TestUpgradeToSprintOnePreservesLegacyClubAndUser(t *testing.T) {
+	ctx, db := testPool(t)
+	if err := Apply(ctx, db, baselineOnly(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO users(id,email,display_name) VALUES('f0000000-0000-4000-8000-000000000001','legacy@example.invalid','Legacy'); INSERT INTO clubs(id,name) VALUES('f0000000-0000-4000-8000-000000000002','Legacy club')`); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := Apply(ctx, db, sourceDir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if scalar(t, ctx, db, `SELECT count(*) FROM schema_migrations`) != 2 {
+		t.Fatal("expected two recorded migrations")
+	}
+	if scalar(t, ctx, db, `SELECT count(*) FROM users WHERE email='legacy@example.invalid' AND email_verified_at IS NULL`) != 1 {
+		t.Fatal("legacy user not preserved")
+	}
+	if scalar(t, ctx, db, `SELECT count(*) FROM clubs WHERE name='Legacy club' AND archived_at IS NULL`) != 1 {
+		t.Fatal("legacy club not preserved")
 	}
 }

@@ -1,55 +1,70 @@
-# Desenvolvimento — Sprint 0
+# Desenvolvimento — Sprint 1
 
-## Organização
+## Organização e módulos
 
-`backend/main.go` compõe o processo e gere arranque e paragem. `internal/config` lê configuração; `internal/httpapi` contém transporte HTTP e acesso ao catálogo; `internal/migrate` aplica SQL versionado. `database/` é a fonte única das migrações. `apps/` continua reservado às experiências React futuras.
+`backend/main.go` compõe o processo e gere arranque/paragem. `internal/config` lê configuração; `internal/httpapi` fornece catálogo, readiness e proteção HTTP; `internal/migrate` aplica SQL versionado; `internal/identity` gere contas, sessões e códigos; `internal/organizations` valida pertenças, clubes, convites e branding. `database/` é a fonte única das migrações. `apps/manager` contém a primeira interface React/TypeScript; as restantes aplicações continuam reservadas.
 
-Os futuros módulos `identity`, `organizations`, `memberships`, `teams`, `athletes` e restantes devem ter dependências explícitas, serviços de domínio separados dos handlers e autorização no servidor. Não criar microsserviços nem quatro cópias da lógica comum. Conteúdo privado permanece privado por defeito. A cena e timeline do futuro editor terão uma representação versionada comum aos renderizadores 2D e 3D.
+Futuros módulos `teams`, `athletes`, `training`, `matches` e restantes devem ter dependências explícitas, domínio separado do transporte e autorização por recurso no servidor. Não criar microsserviços nem duplicar lógica por modalidade. A futura cena/timeline do editor será partilhada por renderizadores 2D e 3D.
 
-Usar `gofmt`, erros sem segredos, contextos com prazo e SQL parametrizado. Adicionar testes de comportamento à alteração e atualizar OpenAPI. Toda a primeira funcionalidade privada exige testes de isolamento por clube; as constraints existentes não substituem autorização HTTP. Não há frontend nesta entrega para auditar acessibilidade: os primeiros componentes devem incluir navegação por teclado, labels e contraste testados.
+Usar `gofmt`, SQL parametrizado, contextos limitados e erros sem credenciais. Acrescentar testes de comportamento, autorização e contrato OpenAPI a cada alteração. No frontend, manter labels, navegação por teclado, estados de foco, erros e layout responsivo; a validação de contraste do branding no backend não substitui uma auditoria de acessibilidade da aplicação.
 
-## Configuração
+## Configuração e serviços
 
-O Compose exige `DB_PASSWORD` no `.env` local ignorado pelo Git. Para executar o backend fora do Compose, definir `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` e `PGSSLMODE`, ou usar `DATABASE_URL`. Não imprimir estas variáveis nem inserir valores em scripts ou documentação. `DATABASE_URL`, quando definido, usa o formato suportado por pgx. `MIGRATIONS_DIR` tem o valor predefinido `../database` ao executar a partir de `backend/`; a imagem usa `/app/database`. `PORT` é 8080 por omissão e `HOST` permite selecionar a interface.
+O `.env` ignorado pelo Git contém `DB_PASSWORD` e pode conter `COMPOSE_PROJECT_NAME`, `API_PORT`, `MANAGER_PORT`, `MAIL_PORT`. Preservar estas variáveis e o diretório/nome do projeto ao atualizar. As portas publicadas por omissão são 18080, 18081 e 18025; PostgreSQL e SMTP permanecem na rede interna do Compose.
 
-O PostgreSQL do Compose não publica uma porta no host. Para Go no host, usar uma instância PostgreSQL de desenvolvimento separada ou um override local explícito que publique a porta apenas em loopback. Não expor a base à rede pública. As credenciais do `.env` são só de desenvolvimento; produção exige TLS, gestão de segredos e revisão operacional.
+Fora do Compose, configurar PostgreSQL com `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`, ou `DATABASE_URL`. Não interpolar palavras-passe num URI sem codificação adequada e não imprimir configuração completa. `MIGRATIONS_DIR` é `../database` ao arrancar de `backend/` e `/app/database` na imagem; `PORT` interno é 8080 por omissão. `HOST` seleciona a interface de escuta.
 
-## Migrações e seed
+`SMTP_HOST=mailpit` e `SMTP_PORT=1025` no Compose usam uma caixa de email local, consultável no browser em 18025. Fora do Compose, SMTP pode apontar para loopback. O adaptador fornecido só permite Mailpit/loopback: não é um conector de email de produção. Não colocar chaves SMTP nem credenciais no código. `COOKIE_SECURE=false` serve HTTP local; um deployment HTTPS exige cookies Secure, proxy e configuração operacional próprios.
 
-O arranque liga à base, adquire um advisory lock transacional e aplica `database/NNN_nome.sql` por ordem. O ledger `schema_migrations` guarda nome, checksum SHA-256 e data. A transação impede registos de sucesso se um SQL falhar; o lock evita duas APIs migrarem simultaneamente. Se uma migração aplicada for alterada ou desaparecer, o arranque falha em vez de aceitar divergência silenciosa.
+## Autenticação e publicação
 
-`001_init.sql` permanece inalterado. O SQL idempotente permite adotar o esquema do starter sem apagar registos e mantém o seed de cinco modalidades e sete variantes. `CREATE TABLE IF NOT EXISTS` não reconcilia alterações manuais incompatíveis; inspecionar a base se a adoção falhar. Acrescentar alterações em novos ficheiros (`002_...sql`, etc.); não alterar o histórico. Rever migrações, fazer backup e validar numa cópia antes de aplicar a dados importantes. Não há comando de rollback destrutivo automático.
+Passwords têm entre 12 e 72 bytes e são guardadas com bcrypt. A sessão opaca em cookie `futryva_session` é HttpOnly, SameSite=Lax, limitada a 24 horas, guardada como hash e revogável no servidor. Refresh roda o identificador; reset de palavra-passe revoga sessões. Códigos de confirmação duram 24 horas; recuperação, 30 minutos; convites, sete dias. Os códigos são de uso único e os hashes, não os valores originais, ficam nas tabelas de autenticação/convites.
 
-A ordem é numérica, incluindo versões superiores a 999. Versões zero, duplicadas, nomes SQL inválidos e migrações acrescentadas abaixo da última versão aplicada são rejeitados. `.gitattributes` mantém SQL com finais de linha LF, evitando divergências de checksum entre checkouts Windows e Linux.
+O browser usa pedidos da mesma origem ao proxy Manager. Escritas validam Origin/Sec-Fetch-Site e JSON; não há CORS aberto. Clientes sem Origin podem usar a API em JSON. Não guardar sessões em localStorage nem inserir códigos em URLs duradouras. O Mailpit local contém os emails e os seus códigos e só deve ser exposto em loopback durante o desenvolvimento.
 
-## Verificações
+Confirmar email antes das escritas privadas. A pertença ao clube é verificada em cada operação; URLs/clubId do cliente não conferem acesso. Presidente/diretor gerem branding e convites; apenas presidente arquiva o clube e convida diretores. Draft, histórico, membros e emails de convites ficam restritos à gestão. Um treinador lê o clube a que pertence, mas não obtém gestão por aceitar um convite.
 
-Na raiz, `sh scripts/check.sh` verifica formatação, análise estática, testes e build com Go instalado. Alternativamente:
+Publicar branding acrescenta uma versão e muda a referência pública. Alterar o rascunho não altera a versão pública; rollback publica uma nova versão com o tema histórico e alinha o rascunho. `DELETE /v1/clubs/{clubId}` arquiva logicamente, sem apagar registos. Os endpoints públicos só devolvem identidade publicada de clubes não arquivados.
+
+Imagens de branding aceitam HTTPS ou data URLs de PNG/JPEG/WebP estático até 200 KiB por imagem e 16 megapixels. SVG e formatos ativos não são permitidos. Esta opção mantém a primeira entrega independente de S3/MinIO; armazenamento dedicado e processamento de media pertencem a uma fase própria. O backend exige contraste mínimo 4,5:1 entre texto e superfície, até 20 patrocinadores e seis cores de equipamento.
+
+## Migrações e preservação
+
+O arranque adquire advisory lock transacional, valida o histórico/checksums e aplica novas migrações numericamente. `schema_migrations` guarda nome, SHA-256 e data. SQL falhado não deixa DDL nem ledger parcialmente aplicados. Nomes SQL inválidos, versões zero/duplicadas/retroativas e ficheiros históricos alterados ou ausentes provocam falha.
+
+`001_init.sql` permanece inalterado. O seu seed repete-se sem duplicar cinco modalidades/sete variantes e adota bases do starter sem reset. `002_identity_and_clubs.sql` acrescenta identidade, sessões, códigos, arquivo e branding/convites. Não há rollback destrutivo automático. Criar alterações em novos ficheiros numerados; `.gitattributes` mantém SQL com LF entre Windows e Linux.
+
+Antes de aplicar migrações a dados importantes, fazer backup e validar numa cópia. A migração de emails normalizados exige que não existam duplicados que só diferem em maiúsculas/minúsculas; se existirem, a transação falha e os dados ficam preservados para resolução explícita. Nunca corrigir falhas eliminando volumes ou alterando checksums.
+
+## Verificações locais
 
 ```sh
-cd backend
-go mod download
-go vet ./...
-go test -race -count=1 ./...
-go build ./...
+sh scripts/check.sh
+cd apps/manager
+npm ci
+npm test
+npm run build
 ```
 
-Definir `DATABASE_TEST_URL` no processo de teste para ativar a integração PostgreSQL. Usar uma base exclusiva de testes, nunca produção nem uma base partilhada com dados pessoais. Os testes criam schemas isolados e dados sintéticos e preservam esses schemas; não limpam dados existentes. A ausência da variável deixa os testes de integração explicitamente ignorados. A suite valida a repetição das migrações, preservação de dados existentes, integridade do histórico e restrições de associação entre clubes; verificar os nomes efetivos no output da execução.
+O script Go executa formatação, vet, testes com race detector e build. Os testes PostgreSQL exigem `DATABASE_TEST_URL` numa base exclusiva, nunca produção/dados pessoais. Criam schemas aleatórios com dados sintéticos e mantêm-nos; a ausência da variável produz skips explícitos. Cobrem migrações, autenticação, expiração/replay, revogação e autorização entre clubes.
 
-Com o Compose saudável, a partir da raiz:
+Com o Compose saudável:
 
 ```sh
-python3 scripts/smoke.py
+python3 scripts/smoke.py http://127.0.0.1:18080
+python3 scripts/smoke_sprint1.py --base-url http://127.0.0.1:18081 --mailpit-url http://127.0.0.1:18025
 ```
 
-No Windows com Python instalado, usar `py scripts/smoke.py`. O smoke testa a API real, o catálogo esperado e erros 404/405; não basta um PID ou uma porta aberta. O OpenAPI em `docs/openapi.yaml` descreve apenas os endpoints implementados. As rotas propostas em `05_API_E_FLUXOS.md` continuam planeamento.
+O smoke Sprint 1 usa cookies independentes, emails únicos e Mailpit real; verifica códigos, isolamento, branding, convites, rotação/logout, reset e arquivo. Mantém os registos e mensagens sintéticos. Pode apontar diretamente à API, mantendo Origin igual ao endereço usado. No Windows com Python instalado, substituir `python3` por `py`.
 
-## CI
+Para frontend fora de Docker, `npm run dev` em `apps/manager` usa o proxy Vite para a API. Consultar o README dessa app para a variável do destino local. O build TypeScript faz parte de `npm run build`.
 
-O workflow `.github/workflows/ci.yml` usa Go 1.26 e PostgreSQL 16. Gera uma credencial aleatória por execução, mascara-a nos logs e passa-a ao serviço de teste sem a versionar. Executa formatação, `go vet`, testes com race detector (incluindo integração), build e smoke da API real. O PostgreSQL de CI é descartável e só publica loopback; não usa a base nem os volumes de desenvolvimento.
+## CI e limites da validação
 
-Criar o workflow não prova uma execução no GitHub. O relatório da tarefa deve distinguir validação local concluída, checks ignorados e execução remota ainda por observar.
+`.github/workflows/ci.yml` usa Go 1.26, Node.js 22, PostgreSQL 16 e Mailpit. Gera uma credencial de DB por execução e mascara-a; executa testes Go com integração/race, build, smoke da API real, testes do Manager e build TypeScript/Vite. Os serviços CI são separados dos volumes de desenvolvimento e publicados só em loopback.
+
+Criar ou alterar o workflow não prova uma execução remota no GitHub. O relatório deve distinguir checks locais efetivamente executados, skips e resultado remoto observado. Esta entrega não substitui testes de carga, auditoria de segurança, MFA, email de produção, backups/restauro e revisão de proteção de dados necessários ao lançamento.
 
 ## Ambiente na nuvem
 
-Cada tarefa já tem isolamento próprio: usar o checkout existente, sem criar worktrees salvo pedido explícito. Dependências e ficheiros podem ser retidos num snapshot; processos precisam de voltar a arrancar. As instruções guardadas no ambiente devem incluir diretório, arranque do Compose e pedidos de readiness. Uma configuração guardada ainda precisa de revisão e publicação pelo utilizador.
+Cada tarefa já tem isolamento próprio: usar o checkout existente, sem criar worktrees salvo pedido explícito. Dependências/ficheiros podem ser retidos em snapshot; processos têm de arrancar novamente. Instruções guardadas devem conter diretório, arranque de API/Manager/Mailpit e readiness; configuração guardada ainda exige revisão/publicação pelo utilizador. O build deve manter proxy/CA e verificações TLS e de integridade.

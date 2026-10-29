@@ -21,4 +21,4 @@ products; product_variants; inventory_movements; carts; orders; order_items; pay
 - Dados privados do treinador não são automaticamente propriedade do clube; definir propriedade/visibilidade ao criar.
 
 ## Estado atual do repositório
-`database/001_init.sql` contém só tabelas iniciais de sports, sport_variants, users, clubs, club_memberships, teams, team_coaches, players, team_players e exercises. **O restante acima é desenho futuro, ainda não migrado.**
+`database/001_init.sql` preserva as tabelas iniciais de sports, sport_variants, users, clubs, club_memberships, teams, team_coaches, players, team_players e exercises. A migração aditiva `002_identity_and_clubs.sql` acrescenta verificação de email, sessões e códigos de acesso, arquivo de clubes, rascunhos e versões de branding e convites. **As entidades restantes são desenho futuro, ainda não migrado.**

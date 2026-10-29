@@ -2,7 +2,14 @@
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
 **/node_modules
 **/build
+**/dist
 **/coverage
 **/*.log
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report

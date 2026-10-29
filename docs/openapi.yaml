@@ -1,92 +1,1358 @@
 openapi: 3.1.0
 info:
-  title: FUTRYVA API — fundação
-  version: 0.1.0
-  description: Apenas endpoints existentes. Autenticação e gestão de clubes são trabalho futuro.
+  title: FUTRYVA API — Sprint 1
+  version: 0.2.0
+  description: API de desenvolvimento multiclube. Cookies HttpOnly, JSON e escritas
+    da mesma origem. SMTP é Mailpit local; não é uma configuração comercial. Sessões/códigos
+    brutos nunca são devolvidos em JSON. Listas atuais têm limite 100 sem cursor; paginação
+    cursor é evolução futura.
+security:
+- cookieAuth: []
+tags:
+- name: Fundação
+- name: Identidade
+- name: Clubes
 paths:
   /:
     get:
       operationId: getService
       summary: Identificação da API
+      tags:
+      - Fundação
       responses:
         '200':
-          description: Metadados da fundação técnica
+          description: Operação concluída
           content:
             application/json:
               schema:
-                type: object
-                required: [name, stage, sports, health]
-                properties:
-                  name: {type: string, const: FUTRYVA}
-                  stage: {type: string, const: initial foundation}
-                  sports: {type: string, const: GET /v1/sports}
-                  health: {type: string, const: GET /health}
-        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+                $ref: '#/components/schemas/Service'
+        '405':
+          $ref: '#/components/responses/405'
+      security: []
   /health:
     get:
       operationId: getReadiness
       summary: Disponibilidade da base e do esquema necessário
+      tags:
+      - Fundação
       responses:
         '200':
-          description: API e dependências disponíveis
+          description: Operação concluída
           content:
             application/json:
               schema:
-                type: object
-                required: [status, service]
-                properties:
-                  status: {type: string, const: ok}
-                  service: {type: string, const: FUTRYVA API}
+                $ref: '#/components/schemas/Readiness'
         '503':
-          description: Base de dados ou esquema indisponível
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
-        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+          $ref: '#/components/responses/503'
+        '405':
+          $ref: '#/components/responses/405'
+      security: []
   /v1/sports:
     get:
       operationId: listSportVariants
-      summary: Catálogo das modalidades e variantes
+      summary: Catálogo de cinco modalidades e sete variantes
+      tags:
+      - Fundação
       responses:
         '200':
-          description: Variantes ordenadas pela ordem do catálogo; array vazio se não houver registos
+          description: Operação concluída
           content:
             application/json:
               schema:
                 type: array
-                items: {$ref: '#/components/schemas/SportVariant'}
+                items:
+                  $ref: '#/components/schemas/SportVariant'
         '500':
-          description: Falha ao consultar o catálogo
+          $ref: '#/components/responses/500'
+        '405':
+          $ref: '#/components/responses/405'
+      security: []
+  /v1/auth/register:
+    post:
+      operationId: register
+      summary: Criar conta e sessão
+      tags:
+      - Identidade
+      responses:
+        '201':
+          description: Operação concluída
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/Error'}
-        '405': {$ref: '#/components/responses/MethodNotAllowed'}
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+        '409':
+          $ref: '#/components/responses/409'
+      security: []
+      description: Confirmação por código email válido por 24 horas. Corpo JSON máximo
+        16 KiB. Cookie HttpOnly SameSite=Lax; Secure conforme configuração. Emails
+        repetidos dão 409. Falha de entrega conserva conta e sessão e devolve emailDeliveryPending.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+  /v1/auth/login:
+    post:
+      operationId: login
+      summary: Iniciar sessão
+      tags:
+      - Identidade
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+        '401':
+          $ref: '#/components/responses/401'
+      security: []
+      description: Resposta 401 genérica para credenciais inválidas. Cookie de sessão
+        com duração máxima de 24 horas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      summary: Revogar sessão atual
+      tags:
+      - Identidade
+      responses:
+        '204':
+          description: Sem conteúdo
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '503':
+          $ref: '#/components/responses/503'
+      security: []
+      description: Idempotente sem cookie; revoga no servidor e limpa o cookie do
+        browser.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empty'
+  /v1/auth/refresh:
+    post:
+      operationId: refresh
+      summary: Rodar sessão e revogar identificador anterior
+      tags:
+      - Identidade
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empty'
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: Consultar utilizador da sessão
+      tags:
+      - Identidade
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '503':
+          $ref: '#/components/responses/503'
+  /v1/auth/verify-email:
+    post:
+      operationId: verifyEmail
+      summary: Consumir código de confirmação de email
+      tags:
+      - Identidade
+      responses:
+        '204':
+          description: Sem conteúdo
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+      security: []
+      description: Código válido 24 horas e utilizável uma única vez; repetido/expirado/inválido
+        dá 400. Não exige sessão.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenInput'
+  /v1/auth/resend-verification:
+    post:
+      operationId: resendVerification
+      summary: Reenviar código para conta autenticada
+      tags:
+      - Identidade
+      responses:
+        '202':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+        '401':
+          $ref: '#/components/responses/401'
+      description: Resposta genérica; conta já verificada não recebe novo código.
+        Falha SMTP pode dar 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empty'
+  /v1/auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: Pedir código para recuperar acesso
+      tags:
+      - Identidade
+      responses:
+        '202':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+      security: []
+      description: Resposta 202 genérica não revela existência da conta ou entrega
+        SMTP. Código de recuperação válido 30 minutos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailInput'
+  /v1/auth/reset-password:
+    post:
+      operationId: resetPassword
+      summary: Redefinir palavra-passe e revogar sessões
+      tags:
+      - Identidade
+      responses:
+        '204':
+          description: Sem conteúdo
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '429':
+          $ref: '#/components/responses/429'
+        '503':
+          $ref: '#/components/responses/503'
+      security: []
+      description: Consome código de uso único, altera hash e revoga todas as sessões
+        existentes; limpa cookie da resposta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetInput'
+  /v1/clubs:
+    get:
+      operationId: listClubs
+      summary: Listar clubes da conta
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubList'
+        '401':
+          $ref: '#/components/responses/401'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Máximo 100 clubes; um clube por pertença efetiva. Não inclui clubes
+        arquivados.
+    post:
+      operationId: createClub
+      summary: Criar clube e pertença de presidente
+      tags:
+      - Clubes
+      responses:
+        '201':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Exige email verificado. Cria rascunho inicial; branding público
+        começa null/versão0.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubInput'
+  /v1/clubs/{clubId}:
+    get:
+      operationId: getClub
+      summary: Consultar clube a que a conta pertence
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      parameters:
+      - &id001
+        $ref: '#/components/parameters/clubId'
+    patch:
+      operationId: updateClub
+      summary: Alterar nome do clube
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '415':
+          $ref: '#/components/responses/415'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Presidente/diretor com email verificado. Enviar name e shortName
+        completos; shortName omitido fica vazio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubInput'
+      parameters:
+      - *id001
+    delete:
+      operationId: archiveClub
+      summary: Arquivar clube sem eliminar dados
+      tags:
+      - Clubes
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente com email verificado. O clube arquivado deixa de
+        surgir em consultas privadas/públicas.
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/branding/draft:
+    get:
+      operationId: getBrandingDraft
+      summary: Consultar rascunho privado
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThemeResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor; o rascunho nunca integra o endpoint público.
+      parameters:
+      - *id001
+    put:
+      operationId: saveBrandingDraft
+      summary: Guardar rascunho validado
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThemeResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '415':
+          $ref: '#/components/responses/415'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor verificado. Corpo até 1 MiB. Guardar não publica.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThemeInput'
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/branding/publish:
+    post:
+      operationId: publishBranding
+      summary: Publicar rascunho em nova versão
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedBranding'
+        '400':
+          $ref: '#/components/responses/400'
+        '415':
+          $ref: '#/components/responses/415'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor verificado. Acrescenta versão imutável e
+        muda a referência pública; serializa por clube.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Empty'
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/branding/versions:
+    get:
+      operationId: listBrandingVersions
+      summary: Histórico privado de publicações
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandingVersions'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor. Até 100 versões, mais recentes primeiro.
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/branding/rollback:
+    post:
+      operationId: rollbackBranding
+      summary: Restaurar tema histórico numa nova versão
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedBranding'
+        '400':
+          $ref: '#/components/responses/400'
+        '415':
+          $ref: '#/components/responses/415'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor verificado. Não reescreve histórico; cria
+        versão maior e atualiza rascunho.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RollbackInput'
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/members:
+    get:
+      operationId: listMembers
+      summary: Consultar membros e papéis
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Members'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor. Até 100 registos; emails não são públicos.
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/invitations:
+    get:
+      operationId: listInvitations
+      summary: Consultar convites de um clube
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitations'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Só presidente/diretor. Até 100 convites recentes. Não devolve o
+        código nem o hash.
+      parameters:
+      - *id001
+    post:
+      operationId: inviteMember
+      summary: Convidar treinador, assistente ou diretor
+      tags:
+      - Clubes
+      responses:
+        '201':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '409':
+          $ref: '#/components/responses/409'
+        '415':
+          $ref: '#/components/responses/415'
+        '503':
+          $ref: '#/components/responses/503'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Email verificado. Presidente/diretor podem convidar coach/assistant;
+        só presidente convida director. Código enviado ao email, válido 7 dias. Membro
+        existente ou convite pendente dá 409; revogar antes de emitir outro. Falha
+        SMTP revoga o convite e dá 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteInput'
+      parameters:
+      - *id001
+  /v1/clubs/{clubId}/invitations/{invitationId}:
+    delete:
+      operationId: revokeInvitation
+      summary: Revogar convite ainda não aceite
+      tags:
+      - Clubes
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Presidente/diretor verificado; convites de diretor apenas pelo
+        presidente. Não elimina o registo.
+      parameters:
+      - *id001
+      - $ref: '#/components/parameters/invitationId'
+  /v1/invitations/accept:
+    post:
+      operationId: acceptInvitation
+      summary: Aceitar convite pela conta destinatária
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
+        '500':
+          $ref: '#/components/responses/500'
+      description: Conta autenticada e email verificado igual ao destinatário. Código
+        inválido/expirado/revogado/repetido ou de outro email dá 400 genérico. Uma
+        aceitação acrescenta pertença, sem alterar outras pertenças.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenInput'
+  /v1/public/clubs/{clubId}:
+    get:
+      operationId: getPublishedClub
+      summary: Consultar apenas identidade publicada do clube
+      tags:
+      - Clubes
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicClubResponse'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      security: []
+      description: 404 antes da primeira publicação ou depois do arquivo. Não devolve
+        rascunho, membros nem convites.
+      parameters:
+      - *id001
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: futryva_session
+      description: Cookie HttpOnly SameSite=Lax de sessão opaca, revogável e limitada a 24 h.
+        Secure configurável para HTTPS. Browser envia Origin; sem CORS aberto.
+  parameters:
+    clubId:
+      name: clubId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    invitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
-    MethodNotAllowed:
-      description: Método não permitido; GET e HEAD são suportados
-      headers:
-        Allow:
-          schema: {type: string, const: 'GET, HEAD'}
+    '400':
+      description: Dados ou código inválidos
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/Error'}
+          schema:
+            $ref: '#/components/schemas/Error'
+    '401':
+      description: Sessão/credenciais ausentes, expiradas ou inválidas
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '403':
+      description: Email não verificado, papel insuficiente ou origem não permitida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '404':
+      description: Recurso inexistente ou não acessível por esta conta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '405':
+      description: Método não permitido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '409':
+      description: Conflito com registo ou convite existente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '415':
+      description: Envie application/json
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '429':
+      description: Demasiados pedidos; respeitar Retry-After
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: Segundos antes de tentar novamente.
+    '500':
+      description: Falha interna ou de base de dados
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '503':
+      description: Serviço ou dependência temporariamente indisponível
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
-    SportVariant:
-      type: object
-      required: [sportCode, sport, variant, playersOnField]
-      properties:
-        sportCode: {type: string, examples: [futsal]}
-        sport: {type: string, examples: [Futsal]}
-        variant: {type: string, examples: [Futsal]}
-        playersOnField: {type: integer, minimum: 1, examples: [5]}
     Error:
       type: object
-      required: [error]
       properties:
         error:
           type: object
-          required: [code, message]
           properties:
-            code: {type: string}
-            message: {type: string}
+            code:
+              type: string
+            message:
+              type: string
+          additionalProperties: false
+          required:
+          - code
+          - message
+      additionalProperties: false
+      required:
+      - error
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        emailVerified:
+          type: boolean
+      additionalProperties: false
+      required:
+      - id
+      - email
+      - displayName
+      - emailVerified
+    UserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        emailDeliveryPending:
+          type: boolean
+          description: No registo, true se o SMTP local falhou; a conta/sessão existem
+            e pode reenviar confirmação.
+      additionalProperties: false
+      required:
+      - user
+    Email:
+      type: string
+      format: email
+      maxLength: 254
+      description: Normalizado para minúsculas e sem espaços exteriores.
+    Password:
+      type: string
+      writeOnly: true
+      description: Entre 12 e 72 bytes UTF-8; não existe limite apenas por número
+        de caracteres.
+      minLength: 1
+    ActionToken:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: ^[A-Za-z0-9_-]{43}$
+      writeOnly: true
+      description: Código opaco recebido por email, de uso único.
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      additionalProperties: false
+      required:
+      - message
+    Empty:
+      type: object
+      properties: {}
+      additionalProperties: false
+    RegisterInput:
+      type: object
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        password:
+          $ref: '#/components/schemas/Password'
+      additionalProperties: false
+      required:
+      - email
+      - displayName
+      - password
+    LoginInput:
+      type: object
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          type: string
+          writeOnly: true
+      additionalProperties: false
+      required:
+      - email
+      - password
+    TokenInput:
+      type: object
+      properties:
+        token:
+          $ref: '#/components/schemas/ActionToken'
+      additionalProperties: false
+      required:
+      - token
+    ResetInput:
+      type: object
+      properties:
+        token:
+          $ref: '#/components/schemas/ActionToken'
+        password:
+          $ref: '#/components/schemas/Password'
+      additionalProperties: false
+      required:
+      - token
+      - password
+    EmailInput:
+      type: object
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+      additionalProperties: false
+      required:
+      - email
+    Sponsor:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        url:
+          type: string
+          description: HTTPS sem credenciais, até 2048 caracteres; vazio se não existir.
+      additionalProperties: false
+      required:
+      - name
+    Color:
+      type: string
+      pattern: ^#[0-9a-fA-F]{6}$
+      description: Cor hexadecimal normalizada para minúsculas.
+    BrandingImage:
+      type: string
+      description: Vazio, URL HTTPS até 2048 caracteres sem credenciais, ou data URL
+        base64 de PNG/JPEG/WebP estático válido até 200 KiB e 16 megapixels. SVG não
+        é aceite.
+    Theme:
+      type: object
+      properties:
+        primaryColor:
+          $ref: '#/components/schemas/Color'
+        secondaryColor:
+          $ref: '#/components/schemas/Color'
+        accentColor:
+          $ref: '#/components/schemas/Color'
+        surfaceColor:
+          $ref: '#/components/schemas/Color'
+        textColor:
+          $ref: '#/components/schemas/Color'
+        logoUrl:
+          $ref: '#/components/schemas/BrandingImage'
+        coverUrl:
+          $ref: '#/components/schemas/BrandingImage'
+        sponsors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sponsor'
+          maxItems: 20
+        kitColors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Color'
+          maxItems: 6
+      additionalProperties: false
+      required:
+      - primaryColor
+      - secondaryColor
+      - accentColor
+      - surfaceColor
+      - textColor
+      description: Texto e superfície devem ter contraste WCAG mínimo 4,5:1. Arrays
+        ausentes são normalizados para arrays vazios.
+    ThemeResponse:
+      type: object
+      properties:
+        theme:
+          $ref: '#/components/schemas/Theme'
+      additionalProperties: false
+      required:
+      - theme
+    ThemeInput:
+      type: object
+      properties:
+        theme:
+          $ref: '#/components/schemas/Theme'
+      additionalProperties: false
+      required:
+      - theme
+    ClubRole:
+      type: string
+      enum:
+      - president
+      - director
+      - coach
+      - assistant
+      - staff
+    Club:
+      type: object
+      properties:
+        id: &id002
+          type: string
+          format: uuid
+        name: &id003
+          type: string
+        shortName: &id004
+          type: string
+        branding: &id005
+          anyOf:
+          - $ref: '#/components/schemas/Theme'
+          - type: 'null'
+        brandingVersion: &id006
+          type: integer
+          minimum: 0
+        archived: &id007
+          type: boolean
+        role:
+          $ref: '#/components/schemas/ClubRole'
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - shortName
+      - branding
+      - brandingVersion
+      - archived
+      - role
+    PublicClub:
+      type: object
+      properties:
+        id: *id002
+        name: *id003
+        shortName: *id004
+        branding: *id005
+        brandingVersion: *id006
+        archived: *id007
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - shortName
+      - branding
+      - brandingVersion
+      - archived
+      description: Só existe depois de publicar branding e enquanto o clube não estiver
+        arquivado; não contém membros nem rascunhos.
+    ClubResponse:
+      type: object
+      properties:
+        club:
+          $ref: '#/components/schemas/Club'
+      additionalProperties: false
+      required:
+      - club
+    PublicClubResponse:
+      type: object
+      properties:
+        club:
+          $ref: '#/components/schemas/PublicClub'
+      additionalProperties: false
+      required:
+      - club
+    ClubList:
+      type: object
+      properties:
+        clubs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Club'
+          maxItems: 100
+      additionalProperties: false
+      required:
+      - clubs
+    ClubInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        shortName:
+          type: string
+          maxLength: 30
+      additionalProperties: false
+      required:
+      - name
+    BrandingVersion:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        theme:
+          $ref: '#/components/schemas/Theme'
+        createdAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+      - version
+      - theme
+      - createdAt
+    BrandingVersions:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrandingVersion'
+          maxItems: 100
+      additionalProperties: false
+      required:
+      - versions
+    PublishedBranding:
+      type: object
+      properties:
+        club:
+          $ref: '#/components/schemas/Club'
+        version:
+          type: integer
+          minimum: 1
+      additionalProperties: false
+      required:
+      - club
+      - version
+    RollbackInput:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+      additionalProperties: false
+      required:
+      - version
+    Member:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          $ref: '#/components/schemas/Email'
+        role:
+          $ref: '#/components/schemas/ClubRole'
+      additionalProperties: false
+      required:
+      - userId
+      - displayName
+      - email
+      - role
+    Members:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+          maxItems: 100
+      additionalProperties: false
+      required:
+      - members
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          $ref: '#/components/schemas/Email'
+        role:
+          type: string
+          enum:
+          - director
+          - coach
+          - assistant
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt: &id008
+          type:
+          - string
+          - 'null'
+          format: date-time
+        revokedAt: *id008
+      additionalProperties: false
+      required:
+      - id
+      - email
+      - role
+      - expiresAt
+      - acceptedAt
+      - revokedAt
+    Invitations:
+      type: object
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invitation'
+          maxItems: 100
+      additionalProperties: false
+      required:
+      - invitations
+    InvitationResponse:
+      type: object
+      properties:
+        invitation:
+          $ref: '#/components/schemas/Invitation'
+      additionalProperties: false
+      required:
+      - invitation
+    InviteInput:
+      type: object
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        role:
+          type: string
+          enum:
+          - director
+          - coach
+          - assistant
+      additionalProperties: false
+      required:
+      - email
+      - role
+    SportVariant:
+      type: object
+      properties:
+        sportCode:
+          type: string
+        sport:
+          type: string
+        variant:
+          type: string
+        playersOnField:
+          type: integer
+          minimum: 1
+      additionalProperties: false
+      required:
+      - sportCode
+      - sport
+      - variant
+      - playersOnField
+    Readiness:
+      type: object
+      properties:
+        status:
+          type: string
+          const: ok
+        service:
+          type: string
+          const: FUTRYVA API
+      additionalProperties: false
+      required:
+      - status
+      - service
+    Service:
+      type: object
+      properties:
+        name:
+          type: string
+          const: FUTRYVA
+        stage:
+          type: string
+        sports:
+          type: string
+        health:
+          type: string
+      additionalProperties: false
+      required:
+      - name
+      - stage
+      - sports
+      - health

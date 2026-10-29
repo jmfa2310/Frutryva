@@ -24,11 +24,16 @@ services:
       PGSSLMODE: disable
       MIGRATIONS_DIR: /app/database
       PORT: '8080'
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      COOKIE_SECURE: 'false'
     ports:
-      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:${API_PORT:-18080}:8080'
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test: ["CMD", "/futryva", "healthcheck"]
       interval: 5s
@@ -38,5 +43,28 @@ services:
     read_only: true
     security_opt:
       - no-new-privileges:true
+  manager:
+    build:
+      context: .
+      dockerfile: apps/manager/Dockerfile
+    ports:
+      - '127.0.0.1:${MANAGER_PORT:-18081}:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-Y", "off", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+  mailpit:
+    image: axllent/mailpit@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    ports:
+      - '127.0.0.1:${MAIL_PORT:-18025}:8025'
+    environment:
+      MP_MAX_MESSAGES: '500'
+      MP_SMTP_AUTH_ACCEPT_ANY: 'false'
 volumes:
   postgres_data:
