@@ -15,6 +15,9 @@ type Config struct {
 	MigrationsDir   string
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
+	SMTPHost        string
+	SMTPPort        int
+	SecureCookie    bool
 }
 
 // Load accepts either DATABASE_URL or standard PostgreSQL PG* variables.
@@ -36,6 +39,25 @@ func Load() (Config, error) {
 	c.Address = net.JoinHostPort(os.Getenv("HOST"), port)
 	if c.MigrationsDir == "" {
 		c.MigrationsDir = "../database"
+	}
+	c.SMTPHost = os.Getenv("SMTP_HOST")
+	if c.SMTPHost == "" {
+		c.SMTPHost = "localhost"
+	}
+	c.SMTPPort = 1025
+	if value := os.Getenv("SMTP_PORT"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 || n > 65535 {
+			return Config{}, errors.New("SMTP_PORT must be a valid port")
+		}
+		c.SMTPPort = n
+	}
+	if value := os.Getenv("COOKIE_SECURE"); value != "" {
+		secure, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, errors.New("COOKIE_SECURE must be true or false")
+		}
+		c.SecureCookie = secure
 	}
 	return c, nil
 }

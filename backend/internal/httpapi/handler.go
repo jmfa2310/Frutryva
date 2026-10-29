@@ -10,6 +10,12 @@ import (
 
 func New(store Store, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
+	Mount(mux, store, logger)
+	return mux
+}
+
+// Mount keeps the foundation endpoints available alongside the domain modules.
+func Mount(mux *http.ServeMux, store Store, logger *slog.Logger) {
 	mux.HandleFunc("/health", getOnly(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
@@ -40,7 +46,6 @@ func New(store Store, logger *slog.Logger) http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Resource not found")
 	})
-	return mux
 }
 
 func getOnly(next http.HandlerFunc) http.HandlerFunc {

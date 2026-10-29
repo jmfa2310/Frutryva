@@ -13,7 +13,9 @@ import (
 
 	"futryva/backend/internal/config"
 	"futryva/backend/internal/httpapi"
+	"futryva/backend/internal/identity"
 	"futryva/backend/internal/migrate"
+	"futryva/backend/internal/organizations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -70,9 +72,18 @@ func run(logger *slog.Logger) error {
 		return errors.New("database migrations failed; inspect the migration files and database schema before restarting")
 	}
 	cancel()
+	mailer, err := identity.NewSMTPMailer(cfg.SMTPHost, cfg.SMTPPort)
+	if err != nil {
+		return errors.New("invalid local development SMTP configuration")
+	}
+	auth := identity.New(db, mailer, cfg.SecureCookie)
+	mux := http.NewServeMux()
+	httpapi.Mount(mux, httpapi.NewPostgresStore(db), logger)
+	auth.Mount(mux)
+	organizations.New(db, auth, mailer).Mount(mux)
 	server := &http.Server{
 		Addr:              cfg.Address,
-		Handler:           httpapi.New(httpapi.NewPostgresStore(db), logger),
+		Handler:           httpapi.Secure(mux, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
