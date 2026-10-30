@@ -10,7 +10,7 @@ Configurar o clube atribuído pelo dono da plataforma; identidade visual; modali
 Seguir vários clubes; navegar modalidades/equipas; jogos, resultados, plantéis e estatísticas aprovadas; onze inicial/convocatória quando publicado; notícias, notificações opt-in; loja e histórico de compras; votação e sócios como evoluções. Adeptos sem conta podem ver conteúdo público, se o clube permitir.
 
 ## Admin (operador SaaS)
-O dono da plataforma cria clubes e atribui cada utilizador a um único clube. A criação e o arquivo de clubes são operações do dono. Clientes, planos, subscrições, períodos de teste, limites, suporte, métricas, auditoria e incidentes são os restantes módulos previstos. Acesso de suporte a dados de clientes só por processo autorizado, temporário e auditado.
+O dono da plataforma usa a área Admin da FUTRYVA, sem clube atribuído ou funções de presidente. Cria clubes e atribui cada conta cliente a um único clube. A conta de responsável do clube é distinta da conta de dono. A criação e o arquivo de clubes são operações do dono. Clientes, planos, subscrições, períodos de teste, limites, suporte, métricas, auditoria e incidentes são os restantes módulos previstos. Acesso de suporte a dados de clientes só por processo autorizado, temporário e auditado.
 
 ## Identidades e convites
 - Email + palavra-passe ou login social opcional; email verificado; recuperação de acesso; sessões revogáveis.

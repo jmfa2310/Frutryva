@@ -95,6 +95,7 @@ func newFixture(t *testing.T) *orgFixture {
 	s := New(db, auth, mailer)
 	mux := http.NewServeMux()
 	s.Mount(mux)
+	auth.Mount(mux)
 	f := &orgFixture{db: db, ctx: ctx, h: mux, mail: mailer, s: s}
 	_, f.owner = f.user(t, "platform-owner@example.invalid", true)
 	if err := SetPlatformOwner(ctx, db, "platform-owner@example.invalid"); err != nil {

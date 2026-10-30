@@ -10,6 +10,7 @@ const ownerMessages: Record<string, string> = {
   manager_not_verified: 'O responsável precisa de confirmar o email da sua conta antes da atribuição.',
   platform_owner_required: 'Esta operação está reservada ao dono da plataforma.',
   invalid_request: 'Reveja o nome, nome curto e email do responsável.',
+  platform_owner_cannot_manage_club: 'A conta do dono da plataforma é apenas de administração. Indique uma conta de cliente para gerir o clube.',
 };
 
 function ownerError(error: unknown) {
@@ -72,7 +73,7 @@ export default function PlatformClubs({ onChanged }: { onChanged: () => Promise<
   return <div className="stack">
     <Notice value={notice} />
     <section className="card"><div className="card-header"><h2 className="card-title">Criar e atribuir um clube</h2><span className="badge">Dono da plataforma</span></div><div className="card-body stack">
-      <p className="muted">O responsável deve ter uma conta registada e o email confirmado. Cada pessoa só pode ter um clube ativo. A atribuição não dá acesso aos dados privados de outros clubes.</p>
+      <p className="muted">O responsável deve ter uma conta de cliente registada e o email confirmado. Cada cliente só pode ter um clube ativo. A sua conta de administração não pode ser usada como responsável de um clube.</p>
       <form className="stack" aria-label="Criar e atribuir clube" onSubmit={createClub}>
         <div className="form-grid"><Field label="Nome do novo clube"><input className="input" value={name} onChange={event => setName(event.target.value)} required minLength={2} maxLength={120} /></Field><Field label="Nome curto do novo clube (opcional)"><input className="input" value={shortName} onChange={event => setShortName(event.target.value)} maxLength={30} /></Field></div>
         <Field label="Email do responsável" hint="A conta indicada passa a gerir este clube como presidente."><input className="input" type="email" autoComplete="off" value={managerEmail} onChange={event => setManagerEmail(event.target.value)} required maxLength={254} /></Field>

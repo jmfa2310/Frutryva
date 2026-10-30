@@ -50,7 +50,7 @@ const clubSelect = `SELECT c.id::text,c.name,COALESCE(c.short_name,''),
  ORDER BY CASE m.role WHEN 'president' THEN 0 WHEN 'director' THEN 1 WHEN 'coach' THEN 2 ELSE 3 END LIMIT 1),
  v.theme,COALESCE(c.published_branding_version,0)
  FROM clubs c LEFT JOIN club_branding_versions v ON v.club_id=c.id AND v.version=c.published_branding_version
- WHERE c.archived_at IS NULL AND c.id=(SELECT assigned_club_id FROM users WHERE id=$1)
+ WHERE c.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM platform_owners p WHERE p.user_id=$1) AND c.id=(SELECT assigned_club_id FROM users WHERE id=$1)
  AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=c.id AND m.user_id=$1)`
 
 func scanClub(row pgx.Row) (Club, error) {
@@ -71,7 +71,7 @@ func scanClub(row pgx.Row) (Club, error) {
 func clubFor(ctx context.Context, q queryer, userID, clubID string, lock bool) (Club, error) {
 	sql := clubSelect + ` AND c.id=$2`
 	if lock {
-		sql += ` FOR UPDATE OF c`
+		sql += ` FOR NO KEY UPDATE OF c`
 	}
 	return scanClub(q.QueryRow(ctx, sql, userID, clubID))
 }
@@ -227,6 +227,20 @@ func (s *Service) transaction(w http.ResponseWriter, r *http.Request, u identity
 		return nil, Club{}, false
 	}
 	c, err := clubFor(r.Context(), tx, u.ID, id, true)
+	if err != nil {
+		_ = tx.Rollback(r.Context())
+		dbError(w, err)
+		return nil, Club{}, false
+	}
+	// Serialize tenant writes with promotion and assignment. Re-read scope
+	// with a fresh statement after acquiring the user lock.
+	var lockedUser string
+	if err = tx.QueryRow(r.Context(), `SELECT id::text FROM users WHERE id=$1 FOR UPDATE`, u.ID).Scan(&lockedUser); err != nil {
+		_ = tx.Rollback(r.Context())
+		dbError(w, err)
+		return nil, Club{}, false
+	}
+	c, err = clubFor(r.Context(), tx, u.ID, id, false)
 	if err != nil {
 		_ = tx.Rollback(r.Context())
 		dbError(w, err)

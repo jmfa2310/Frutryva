@@ -7,7 +7,7 @@
 - API modular Go e PostgreSQL 16, migrações versionadas e catálogo de cinco modalidades/sete variantes.
 - Registo, login, confirmação de email, recuperação de acesso, sessões revogáveis e rotação da sessão. Passwords com bcrypt; códigos e sessões guardados como hashes.
 - Clubes criados e atribuídos pelo dono da plataforma. Cada utilizador do Manager tem um único clube; todos os pedidos privados validam a atribuição e a pertença. Alteração de nome pelos gestores e arquivo pelo dono.
-- Identidade visual por clube: rascunho, pré-visualização, publicação e reversão com histórico. Paleta de cores e combinações prontas, emblema, capa, patrocinadores e equipamento. O menu e os botões acompanham as cores publicadas do clube; o rascunho não altera a navegação.
+- Identidade visual por clube: rascunho, pré-visualização, publicação e reversão com histórico. Paleta de cores e combinações prontas, emblema, capa, patrocinadores e equipamento. O menu e os botões do Manager cliente acompanham as cores publicadas do clube; o rascunho não altera a navegação.
 - Convites por email, com validade e uso único; aceitação pela conta verificada do destinatário. Presidente/direção gerem convites e membros; treinadores não gerem o branding.
 - Interface Manager React/TypeScript e caixa de email **local** Mailpit para testar os fluxos completos.
 
@@ -74,7 +74,7 @@ Após registar e confirmar o email do dono, promover explicitamente essa conta n
 docker compose exec api /futryva owner set EMAIL_DA_CONTA_CONFIRMADA
 ```
 
-Voltar a abrir o Manager para ver Administração. Um registo normal nunca obtém este privilégio. Clientes existentes com um único clube mantêm a atribuição automaticamente na migração; não é necessário recriar o clube.
+Voltar a abrir a aplicação: a conta do dono entra diretamente na área FUTRYVA Admin, com cores fixas da plataforma, sem O meu clube ou identidade de clientes. Um registo normal nunca obtém este privilégio. A conta do dono não pode ser atribuída como responsável de um clube. Clientes existentes com um único clube mantêm a atribuição automaticamente. Contas de dono anteriormente associadas a um clube são separadas pela migração 004 sem apagar esse clube ou o histórico; atribuir depois um responsável cliente na Administração.
 
 ## Próxima entrega
 

@@ -6,10 +6,10 @@ import BrandingEditor, { ClubPreview } from './BrandingEditor';
 import { accessibleColor, clubShellStyle } from './clubShell';
 import { Brand, Field, Icon, Modal, Notice, useAction } from './components';
 import People from './People';
-import PlatformClubs from './PlatformClubs';
+import PlatformAdmin from './PlatformAdmin';
 import { canManage, initials, roleName, type Club, type User } from './types';
 
-type Page = 'club' | 'branding' | 'people' | 'account' | 'platform';
+type Page = 'club' | 'branding' | 'people' | 'account';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,20 +39,21 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!user) { setClub(null); return; }
+    if (!user || user.isPlatformOwner) { setClub(null); setClubLoading(false); setClubError(''); return; }
     setClubLoading(true); setClubError('');
     api<{ clubs: Club[] }>('/v1/clubs').then(result => {
       if (!cancelled) setClub(result.clubs.find(item => item.id === user.assignedClubId) || null);
     }).catch(error => { if (!cancelled) setClubError(errorMessage(error)); })
       .finally(() => { if (!cancelled) setClubLoading(false); });
     return () => { cancelled = true; };
-  }, [user?.id, user?.assignedClubId, loadRevision]);
+  }, [user?.id, user?.assignedClubId, user?.isPlatformOwner, loadRevision]);
 
   async function refreshUser() {
     const result = await api<{ user: User }>('/v1/me');
     setUser(result.user); action.setNotice(null);
   }
   async function refreshClub() {
+    if (user?.isPlatformOwner) { setClub(null); return; }
     const result = await api<{ clubs: Club[] }>('/v1/clubs');
     setClub(result.clubs.find(item => item.id === user?.assignedClubId) || null);
   }
@@ -61,6 +62,7 @@ export default function App() {
     // hold the previous user while React commits the profile update.
     const profile = await api<{ user: User }>('/v1/me');
     setUser(profile.user); action.setNotice(null);
+    if (profile.user.isPlatformOwner) { setClub(null); return; }
     const result = await api<{ clubs: Club[] }>('/v1/clubs');
     setClub(result.clubs.find(item => item.id === profile.user.assignedClubId) || null);
   }
@@ -86,13 +88,14 @@ export default function App() {
     if (deliveryPending) action.setNotice({ type: 'warning', text: 'A conta foi criada, mas o email não pôde ser enviado. Use Enviar um novo código para tentar novamente.' });
   }} />;
 
-  const titles = { club: 'O meu clube', branding: 'Identidade do clube', people: 'Pessoas e convites', account: 'A sua conta', platform: 'Administração da plataforma' };
+  if (user.isPlatformOwner) return <PlatformAdmin user={user} refreshUser={refreshUser} onLogout={async () => { await api('/v1/auth/logout', 'POST', {}); setUser(null); setClub(null); setEditing(false); }} />;
+
+  const titles = { club: 'O meu clube', branding: 'Identidade do clube', people: 'Pessoas e convites', account: 'A sua conta' };
   const subtitles = {
     club: 'O clube atribuído à sua conta pelo responsável pela plataforma.',
     branding: 'Prepare, pré-visualize e publique a identidade que representa o seu clube.',
     people: 'Convide as pessoas certas e acompanhe o acesso ao clube.',
     account: 'Confirme o seu email, renove a sessão e consulte os seus convites.',
-    platform: 'Crie os clubes e atribua cada um à conta do respetivo responsável.',
   };
   const navigation: { page: Page; icon: 'clubs' | 'brand' | 'people' | 'account'; label: string }[] = [
     { page: 'club', icon: 'clubs', label: 'O meu clube' },
@@ -100,7 +103,6 @@ export default function App() {
     { page: 'people', icon: 'people', label: 'Pessoas e convites' },
     { page: 'account', icon: 'account', label: 'A minha conta' },
   ];
-  if (user.isPlatformOwner) navigation.push({ page: 'platform', icon: 'clubs', label: 'Administração' });
 
   const noClub = <section className="card empty-state">
     <span className="empty-icon"><Icon name="clubs" /></span>
@@ -110,7 +112,6 @@ export default function App() {
     <div className="inline-actions">
       <button className="button secondary" disabled={action.busy} onClick={() => void action.run(refreshAssignment)}>Verificar atribuição</button>
       {!user.emailVerified && <button className="button primary" onClick={() => navigate('account')}>Confirmar email</button>}
-      {user.isPlatformOwner && <button className="button primary" onClick={() => navigate('platform')}>Gerir clubes da plataforma</button>}
     </div>
   </section>;
 
@@ -122,9 +123,9 @@ export default function App() {
         <span className="sidebar-club-logo">{club.branding?.logoUrl ? <img src={club.branding.logoUrl} alt="" referrerPolicy="no-referrer" /> : initials(club.shortName || club.name)}</span>
         <div className="sidebar-club-name"><strong>{club.name}</strong><span>{roleName(club.role)}</span></div>
       </div>}
-      <div className="sidebar-caption">{user.isPlatformOwner ? 'GESTÃO E ADMINISTRAÇÃO' : 'ESPAÇO DE GESTÃO'}</div>
+      <div className="sidebar-caption">ESPAÇO DE GESTÃO</div>
       <nav aria-label="Navegação principal">{navigation.map(item => <button key={item.page} className={`nav-button ${page === item.page ? 'active' : ''}`} aria-current={page === item.page ? 'page' : undefined} onClick={() => navigate(item.page)}><Icon name={item.icon} />{item.label}</button>)}</nav>
-      <div className="sidebar-foot"><span className="user-avatar">{initials(user.displayName)}</span><div className="user-details"><strong>{user.displayName}</strong><span>{user.isPlatformOwner ? 'Dono da plataforma' : user.emailVerified ? 'Email confirmado' : 'Confirmação pendente'}</span></div><button className="icon-button" aria-label="Terminar sessão" disabled={action.busy} onClick={() => void action.run(async () => { await api('/v1/auth/logout', 'POST', {}); setUser(null); setClub(null); setEditing(false); })}><Icon name="logout" /></button></div>
+      <div className="sidebar-foot"><span className="user-avatar">{initials(user.displayName)}</span><div className="user-details"><strong>{user.displayName}</strong><span>{user.emailVerified ? 'Email confirmado' : 'Confirmação pendente'}</span></div><button className="icon-button" aria-label="Terminar sessão" disabled={action.busy} onClick={() => void action.run(async () => { await api('/v1/auth/logout', 'POST', {}); setUser(null); setClub(null); setEditing(false); })}><Icon name="logout" /></button></div>
     </aside>
     <div className="workspace">
       <header className="topbar"><div className="breadcrumb">Manager <span>/</span> <strong>{titles[page]}</strong></div><div className="topbar-actions">{club && <span className="assigned-club-name">{club.shortName || club.name}</span>}<button className="button secondary small" onClick={() => navigate('account')}>Conta e convites</button></div></header>
@@ -132,8 +133,7 @@ export default function App() {
         {!user.emailVerified && page !== 'account' && <div className="notice warning" role="status">Confirme o seu email para gerir o clube. <button className="link-button" onClick={() => navigate('account')}>Confirmar agora</button></div>}
         <Notice value={action.notice} />
         {page === 'account' ? <Account user={user} refreshUser={refreshUser} onAccepted={async () => { await refreshAssignment(); setPage('club'); }} />
-          : page === 'platform' && user.isPlatformOwner ? <PlatformClubs onChanged={refreshAssignment} />
-            : clubLoading ? <div className="loading-state" role="status">A carregar o seu clube…</div>
+          : clubLoading ? <div className="loading-state" role="status">A carregar o seu clube…</div>
               : clubError ? <div className="stack"><Notice value={{ type: 'error', text: clubError }} /><button className="button secondary" onClick={() => setLoadRevision(value => value + 1)}>Tentar novamente</button></div>
                 : !club ? noClub
                   : page === 'club' ? <div className="stack">

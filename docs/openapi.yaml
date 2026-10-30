@@ -2,10 +2,11 @@ openapi: 3.1.0
 info:
   title: FUTRYVA API — Sprint 1
   version: 0.3.0
-  description: API de desenvolvimento com um único clube atribuído por conta. Só o
-    dono da plataforma cria, atribui e arquiva clubes; não obtém acesso privado automático.
-    Cookies HttpOnly, JSON e escritas da mesma origem. SMTP é Mailpit local, não uma
-    configuração comercial. Listas administrativas têm limite100 sem cursor.
+  description: API com administração da plataforma separada dos clientes. Cada cliente
+    tem um único clube atribuído. O dono cria, atribui e arquiva clubes mas não pode
+    ser gestor, aceitar convite ou entrar no contexto privado de um clube; a aplicação
+    ADMIN mantém identidade neutra da FUTRYVA. Cookies HttpOnly, JSON e escritas da
+    mesma origem. SMTP de desenvolvimento Mailpit local.
 security:
 - cookieAuth: []
 tags:
@@ -345,9 +346,9 @@ paths:
           $ref: '#/components/responses/401'
         '500':
           $ref: '#/components/responses/500'
-      description: 'Devolve zero ou um clube: exige atribuição users.assigned_club_id
-        e pertença ao mesmo clube. Não inclui clubes arquivados. Histórico de pertenças
-        antigas não confere acesso adicional.'
+      description: 'Para clientes, zero ou um clube: exige atribuição users.assigned_club_id
+        e pertença ao mesmo clube ativo. Para donos, sempre {clubs:[]}, independentemente
+        de atribuições ou pertenças históricas. A aplicação ADMIN não chama esta rota.'
     post:
       operationId: rejectSelfServiceClubCreation
       summary: Rota de criação self-service desativada
@@ -391,8 +392,9 @@ paths:
           $ref: '#/components/responses/500'
       parameters:
       - $ref: '#/components/parameters/clubId'
-      description: A conta tem de estar atribuída a este clube e ter uma pertença.
-        Conhecer um UUID ou possuir apenas uma pertença histórica não confere acesso.
+      description: A conta cliente tem de estar atribuída a este clube e ter uma pertença.
+        Donos da plataforma são sempre rejeitados, incluindo perante dados históricos
+        de atribuição ou pertença.
     patch:
       operationId: updateClub
       summary: Alterar nome do clube
@@ -729,11 +731,12 @@ paths:
           $ref: '#/components/responses/500'
         '409':
           $ref: '#/components/responses/409'
-      description: Conta autenticada e email verificado igual ao destinatário. Código
-        inválido/expirado/revogado/repetido ou de outro email dá400 genérico. Conta
-        atribuída a outro clube dá409 user_has_club sem consumir o convite. Conta
-        sem clube ou atribuída ao mesmo clube pode aceitar; não recebe acesso a um
-        segundo clube.
+      description: Conta cliente autenticada, com email verificado igual ao destinatário.
+        Código inválido/expirado/revogado/repetido ou de outro email dá400 genérico.
+        Conta de dono dá409 platform_owner_cannot_manage_club; cliente atribuído a
+        outro clube dá409 user_has_club. Rejeições não consomem o convite nem mudam
+        atribuições. Uma conta cliente sem clube ou atribuída ao mesmo clube pode
+        aceitar.
       requestBody:
         required: true
         content:
@@ -768,8 +771,9 @@ paths:
       summary: Listar clubes para atribuição
       tags:
       - Administração da plataforma
-      description: Apenas dono da plataforma autenticado e com email verificado. Não
-        concede acesso aos dados privados dos clubes.
+      description: Apenas dono autenticado e com email verificado. Lista metadados
+        administrativos e gestores clientes; donos não são devolvidos como gestores.
+        Não concede contexto privado, branding de menu ou pertença ao clube.
       responses:
         '200':
           description: Operação concluída
@@ -790,9 +794,11 @@ paths:
       summary: Criar clube e atribuir gestor
       tags:
       - Administração da plataforma
-      description: Apenas dono da plataforma. O gestor tem de ser uma conta existente,
-        verificada e sem clube atribuído. O dono não recebe pertença automática. user_has_club
-        ou club_has_manager dão409; a transação rejeitada não cria um clube parcial.
+      description: Apenas dono da plataforma. O gestor deve ser uma conta cliente
+        existente e verificada, sem outro clube ativo. Conta de dono é rejeitada com409
+        platform_owner_cannot_manage_club. user_has_club ou club_has_manager dão409;
+        a transação rejeitada não cria clube parcial. O dono nunca recebe clube nem
+        acesso privado como efeito da criação.
       responses:
         '201':
           description: Operação concluída
@@ -826,9 +832,10 @@ paths:
       summary: Atribuir clube a uma conta verificada
       tags:
       - Administração da plataforma
-      description: Apenas dono da plataforma. Conta já atribuída a outro clube dá409
-        user_has_club; clube com outro gestor dá409 club_has_manager. Atribuição igual
-        é idempotente. Não existe transferência implícita entre clubes.
+      description: Apenas dono da plataforma. Conta de dono dá409 platform_owner_cannot_manage_club;
+        conta cliente já atribuída a outro clube dá409 user_has_club; clube com outro
+        gestor cliente dá409 club_has_manager. Atribuição igual é idempotente. A pertença
+        histórica de um dono não bloqueia atribuir um cliente válido.
       responses:
         '200':
           description: Operação concluída
@@ -1002,12 +1009,13 @@ components:
           type: boolean
         isPlatformOwner:
           type: boolean
-          description: Privilégio global atribuído apenas pelo CLI administrativo
-            local; não é aceite em registo/login.
+          description: Conta administrativa da plataforma, sem clube e sem acesso
+            privado como gestor de cliente; atribuída apenas pelo CLI local.
         assignedClubId:
           type: string
           format: uuid
-          description: Único clube atribuído; omitido quando a conta aguarda atribuição.
+          description: Único clube atribuído a uma conta cliente; omitido para contas
+            sem atribuição e sempre omitido para donos da plataforma.
       additionalProperties: false
       required:
       - id
@@ -1503,6 +1511,8 @@ components:
       - email
       - displayName
       additionalProperties: false
+      description: Conta cliente verificada que gere este clube; um dono da plataforma
+        nunca é devolvido como gestor.
     AdminClub:
       type: object
       properties:

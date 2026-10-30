@@ -16,6 +16,7 @@ var (
 	errUserHasClub        = errors.New("user already has another active club")
 	errClubHasManager     = errors.New("club already has another president")
 	errManagerNotVerified = errors.New("manager account is not verified")
+	errOwnerCannotManage  = errors.New("platform owner cannot manage a tenant club")
 )
 
 // SetPlatformOwner is an explicit operator-only bootstrap. Registration never
@@ -32,7 +33,8 @@ func SetPlatformOwner(ctx context.Context, db *pgxpool.Pool, email string) error
 	defer tx.Rollback(context.Background())
 	var id string
 	var verified bool
-	if err = tx.QueryRow(ctx, `SELECT id::text,email_verified_at IS NOT NULL FROM users WHERE lower(email)=$1 FOR UPDATE`, email).Scan(&id, &verified); errors.Is(err, pgx.ErrNoRows) {
+	var previousClub string
+	if err = tx.QueryRow(ctx, `SELECT id::text,email_verified_at IS NOT NULL,COALESCE(assigned_club_id::text,'') FROM users WHERE lower(email)=$1 FOR UPDATE`, email).Scan(&id, &verified, &previousClub); errors.Is(err, pgx.ErrNoRows) {
 		return errors.New("register the operator account first")
 	}
 	if err != nil {
@@ -50,6 +52,14 @@ func SetPlatformOwner(ctx context.Context, db *pgxpool.Pool, email string) error
 			return errors.New("cannot record owner setup")
 		}
 	}
+	if previousClub != "" {
+		if _, err = tx.Exec(ctx, `UPDATE users SET assigned_club_id=NULL WHERE id=$1`, id); err != nil {
+			return errors.New("cannot separate owner account from club")
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO platform_events(actor_id,action,club_id,target_user_id) VALUES($1,'owner_club_assignment_removed',$2,$1)`, id, previousClub); err != nil {
+			return errors.New("cannot audit owner separation")
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return errors.New("cannot finish owner setup")
 	}
@@ -65,6 +75,8 @@ func owner(w http.ResponseWriter, u identity.User) bool {
 }
 func assignmentError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, errOwnerCannotManage):
+		fail(w, 409, "platform_owner_cannot_manage_club", "Platform owners must use a separate client account to manage a club")
 	case errors.Is(err, errUserHasClub):
 		fail(w, 409, "user_has_club", "The account already has another active club")
 	case errors.Is(err, errClubHasManager):
@@ -82,11 +94,20 @@ func assignmentError(w http.ResponseWriter, err error) {
 // user next also serializes competing assignments involving different clubs.
 func assignUser(ctx context.Context, tx pgx.Tx, clubID, userID string, president bool) error {
 	var assigned string
-	var active, verified bool
+	var active, verified, isOwner bool
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(u.assigned_club_id::text,''),
  EXISTS(SELECT 1 FROM clubs c WHERE c.id=u.assigned_club_id AND c.archived_at IS NULL),u.email_verified_at IS NOT NULL
  FROM users u WHERE u.id=$1 FOR UPDATE OF u`, userID).Scan(&assigned, &active, &verified); err != nil {
 		return err
+	}
+	// A separate statement sees a promotion committed while the row-lock
+	// acquisition waited; correlated EXISTS in the locking SELECT may use its
+	// older statement snapshot under PostgreSQL READ COMMITTED.
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM platform_owners WHERE user_id=$1)`, userID).Scan(&isOwner); err != nil {
+		return err
+	}
+	if isOwner {
+		return errOwnerCannotManage
 	}
 	if !verified {
 		return errManagerNotVerified
@@ -96,7 +117,7 @@ func assignUser(ctx context.Context, tx pgx.Tx, clubID, userID string, president
 	}
 	if president {
 		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM club_memberships m JOIN users incumbent ON incumbent.id=m.user_id WHERE m.club_id=$1 AND m.role='president' AND m.user_id<>$2 AND incumbent.assigned_club_id=m.club_id)`, clubID, userID).Scan(&exists); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM club_memberships m JOIN users incumbent ON incumbent.id=m.user_id WHERE m.club_id=$1 AND m.role='president' AND m.user_id<>$2 AND incumbent.assigned_club_id=m.club_id AND NOT EXISTS(SELECT 1 FROM platform_owners p WHERE p.user_id=incumbent.id))`, clubID, userID).Scan(&exists); err != nil {
 			return err
 		}
 		if exists {
@@ -129,7 +150,7 @@ type ManagedClub struct {
 const managedClubSelect = `SELECT c.id::text,c.name,COALESCE(c.short_name,''),
  (SELECT jsonb_build_object('id',u.id::text,'email',u.email,'displayName',u.display_name)
  FROM club_memberships m JOIN users u ON u.id=m.user_id
- WHERE m.club_id=c.id AND m.role='president' AND u.assigned_club_id=c.id ORDER BY u.created_at,u.id LIMIT 1)
+ WHERE m.club_id=c.id AND m.role='president' AND u.assigned_club_id=c.id AND NOT EXISTS(SELECT 1 FROM platform_owners p WHERE p.user_id=u.id) ORDER BY u.created_at,u.id LIMIT 1)
  FROM clubs c WHERE c.archived_at IS NULL`
 
 func managedClub(ctx context.Context, q queryer, id string) (ManagedClub, error) {
@@ -259,7 +280,7 @@ func (s *Service) adminAssign(w http.ResponseWriter, r *http.Request, u identity
 	}
 	defer tx.Rollback(context.Background())
 	var locked string
-	if err = tx.QueryRow(r.Context(), `SELECT id::text FROM clubs WHERE id=$1 AND archived_at IS NULL FOR UPDATE`, id).Scan(&locked); err != nil {
+	if err = tx.QueryRow(r.Context(), `SELECT id::text FROM clubs WHERE id=$1 AND archived_at IS NULL FOR NO KEY UPDATE`, id).Scan(&locked); err != nil {
 		dbError(w, err)
 		return
 	}
@@ -303,7 +324,7 @@ func (s *Service) adminArchive(w http.ResponseWriter, r *http.Request, u identit
 	}
 	defer tx.Rollback(context.Background())
 	var locked string
-	if err = tx.QueryRow(r.Context(), `SELECT id::text FROM clubs WHERE id=$1 AND archived_at IS NULL FOR UPDATE`, id).Scan(&locked); err != nil {
+	if err = tx.QueryRow(r.Context(), `SELECT id::text FROM clubs WHERE id=$1 AND archived_at IS NULL FOR NO KEY UPDATE`, id).Scan(&locked); err != nil {
 		dbError(w, err)
 		return
 	}

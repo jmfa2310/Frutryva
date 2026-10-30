@@ -32,7 +32,7 @@ export default function Auth({ onAuthenticated }: { onAuthenticated: (user: User
 
   return <main className="auth-shell">
     <section className="auth-story" aria-label="FUTRYVA Manager">
-      <div className="auth-story-inner"><Brand /><span className="eyebrow">CADA CLUBE. UMA IDENTIDADE.</span><h1>Mais organização.<br />Mais tempo<br />para o desporto.</h1><p>Uma conta para os seus clubes. Um espaço para gerir pessoas e dar forma à identidade de cada equipa.</p><div className="step-list"><span><Icon name="check" /> Vários clubes, uma só conta</span><span><Icon name="check" /> Pessoas com as permissões certas</span><span><Icon name="check" /> A identidade do clube, nas suas mãos</span></div><span className="muted">FUTRYVA · Plataforma multidesportiva em desenvolvimento</span></div>
+      <div className="auth-story-inner"><Brand /><span className="eyebrow">CADA CLUBE. UMA IDENTIDADE.</span><h1>Mais organização.<br />Mais tempo<br />para o desporto.</h1><p>O seu acesso à FUTRYVA. Gestão do clube e administração da plataforma em espaços separados.</p><div className="step-list"><span><Icon name="check" /> Um clube por conta de cliente</span><span><Icon name="check" /> Pessoas com as permissões certas</span><span><Icon name="check" /> A identidade do clube, nas suas mãos</span></div><span className="muted">FUTRYVA · Plataforma multidesportiva em desenvolvimento</span></div>
     </section>
     <section className="auth-panel"><div className="auth-card">
       <div className="auth-brand"><Brand /></div>

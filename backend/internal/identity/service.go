@@ -105,7 +105,8 @@ func (s *Service) CurrentUser(ctx context.Context, r *http.Request) (User, error
 	}
 	var user User
 	err = s.db.QueryRow(ctx, `SELECT u.id,u.email,u.display_name,u.email_verified_at IS NOT NULL,
-		COALESCE(u.assigned_club_id::text,''),EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id)
+		CASE WHEN EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id) THEN '' ELSE COALESCE(u.assigned_club_id::text,'') END,
+		EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id)
 		FROM auth_sessions s JOIN users u ON u.id=s.user_id
 		WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()`, hashToken(cookie.Value)).Scan(&user.ID, &user.Email, &user.DisplayName, &user.EmailVerified, &user.AssignedClubID, &user.IsPlatformOwner)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -227,7 +228,8 @@ func (s *Service) login(ctx context.Context, email, password string) (User, stri
 	var user User
 	var hash *string
 	err = tx.QueryRow(ctx, `SELECT u.id,u.email,u.display_name,u.email_verified_at IS NOT NULL,u.password_hash,
-		COALESCE(u.assigned_club_id::text,''),EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id)
+		CASE WHEN EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id) THEN '' ELSE COALESCE(u.assigned_club_id::text,'') END,
+		EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id)
 		FROM users u WHERE lower(u.email)=$1 FOR UPDATE OF u`, email).Scan(&user.ID, &user.Email, &user.DisplayName, &user.EmailVerified, &hash, &user.AssignedClubID, &user.IsPlatformOwner)
 	if errors.Is(err, pgx.ErrNoRows) || err == nil && hash == nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
@@ -273,7 +275,8 @@ func (s *Service) refresh(ctx context.Context, raw string) (User, string, error)
 	// Lock the user before sessions, just as login/reset do. This prevents a
 	// refresh racing a password reset from leaving a new session unrevoked.
 	err = tx.QueryRow(ctx, `SELECT u.id,u.email,u.display_name,u.email_verified_at IS NOT NULL,
-		COALESCE(u.assigned_club_id::text,''),EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id) FROM users u
+		CASE WHEN EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id) THEN '' ELSE COALESCE(u.assigned_club_id::text,'') END,
+		EXISTS(SELECT 1 FROM platform_owners o WHERE o.user_id=u.id) FROM users u
 		WHERE u.id=(SELECT user_id FROM auth_sessions WHERE token_hash=$1) FOR UPDATE OF u`, hashToken(raw)).Scan(&user.ID, &user.Email, &user.DisplayName, &user.EmailVerified, &user.AssignedClubID, &user.IsPlatformOwner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", ErrUnauthenticated

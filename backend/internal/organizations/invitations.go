@@ -33,7 +33,7 @@ func (s *Service) listInvitations(w http.ResponseWriter, r *http.Request, u iden
 	if !ok {
 		return
 	}
-	rows, err := s.db.Query(r.Context(), `SELECT `+invitationFields+` FROM club_invitations i WHERE club_id=$1 AND club_id=(SELECT assigned_club_id FROM users WHERE id=$2)
+	rows, err := s.db.Query(r.Context(), `SELECT `+invitationFields+` FROM club_invitations i WHERE club_id=$1 AND NOT EXISTS(SELECT 1 FROM platform_owners p WHERE p.user_id=$2) AND club_id=(SELECT assigned_club_id FROM users WHERE id=$2)
  AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=i.club_id AND m.user_id=$2 AND m.role IN('president','director')) ORDER BY created_at DESC LIMIT 100`, c.ID, u.ID)
 	if err != nil {
 		dbError(w, err)
@@ -181,7 +181,7 @@ func (s *Service) acceptInvitation(w http.ResponseWriter, r *http.Request, u ide
 	hash := hashToken(in.Token)
 	var clubID string
 	// Lock clubs before invitations, matching the order used by create/revoke.
-	err = tx.QueryRow(r.Context(), `SELECT c.id::text FROM clubs c WHERE c.archived_at IS NULL AND c.id=(SELECT club_id FROM club_invitations WHERE token_hash=$1) FOR UPDATE`, hash).Scan(&clubID)
+	err = tx.QueryRow(r.Context(), `SELECT c.id::text FROM clubs c WHERE c.archived_at IS NULL AND c.id=(SELECT club_id FROM club_invitations WHERE token_hash=$1) FOR NO KEY UPDATE`, hash).Scan(&clubID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		invalidInvitation(w)
 		return

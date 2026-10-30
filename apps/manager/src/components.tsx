@@ -35,8 +35,8 @@ export function Field({ label, hint, children, wide = false }: { label: string; 
   return <div className={`field${wide ? ' field-wide' : ''}`}><label className="field-label" htmlFor={id}>{label}</label>{child}{hint && <span className="field-hint" id={id + '-hint'}>{hint}</span>}</div>;
 }
 
-export function Brand() {
-  return <div className="brand"><span className="brand-mark" aria-hidden="true">F</span><span><span className="brand-name">FUTRYVA</span><span className="brand-tag">MANAGER</span></span></div>;
+export function Brand({ kind = 'manager' }: { kind?: 'manager' | 'admin' } = {}) {
+  return <div className="brand"><span className="brand-mark" aria-hidden="true">F</span><span><span className="brand-name">FUTRYVA</span><span className="brand-tag">{kind === 'admin' ? 'ADMIN' : 'MANAGER'}</span></span></div>;
 }
 
 export function Modal({ labelledBy, onClose, children }: { labelledBy: string; onClose: () => void; children: ReactNode }) {

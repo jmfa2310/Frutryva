@@ -121,6 +121,8 @@ Na pasta da instalação existente, após atualizar e confirmar o email dessa co
 docker compose exec api /futryva owner set "EMAIL_DA_TUA_CONTA"
 ```
 
-Substituir o argumento pelo email com que se registou. Não usar a palavra-passe nesse comando. Atualizar a página do Manager para aparecer Administração. É um comando local de operador, não uma opção disponível no registo.
+Substituir o argumento pelo email com que se registou. Não usar a palavra-passe nesse comando. Atualizar a página para entrar na área FUTRYVA Admin. A conta do dono não tem O meu clube nem recebe cores de clientes. Se já foi promovida antes, basta atualizar o código: não é necessário repetir a promoção. É um comando local de operador, não uma opção disponível no registo.
 
-Contas com um único clube anterior conservam esse clube; a navegação passa a usar as cores publicadas. Contas legadas com várias associações aguardam a escolha do dono, sem apagar dados. Ver [clube atribuído](12_CLUBE_ATRIBUIDO.md).
+Contas cliente com um único clube anterior conservam esse clube; a navegação passa a usar as cores publicadas. Contas legadas com várias associações aguardam a escolha do dono, sem apagar dados. Ver [clube atribuído](12_CLUBE_ATRIBUIDO.md).
+
+A migração 004 retira apenas a atribuição de clube de contas do dono. O clube, branding e histórico são preservados e ficam na lista administrativa para atribuição a uma conta cliente distinta. Não recriar nem apagar o clube para fazer esta separação.

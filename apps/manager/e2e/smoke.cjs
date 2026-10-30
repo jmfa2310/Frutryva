@@ -78,7 +78,7 @@ async function register(page, email, name) {
 }
 
 async function provision(page, name, managerEmail) {
-  await page.getByRole("button", { name: "Administração", exact: true }).click();
+  await page.getByRole("button", { name: "Clubes da plataforma", exact: true }).click();
   const form = page.getByRole("form", { name: "Criar e atribuir clube", exact: true });
   await form.getByLabel("Nome do novo clube", { exact: true }).fill(name);
   await form.getByLabel("Nome curto do novo clube (opcional)", { exact: true }).fill("FUT");
@@ -86,6 +86,21 @@ async function provision(page, name, managerEmail) {
   await form.getByRole("button", { name: "Criar e atribuir clube", exact: true }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(page.getByText("Clube criado e atribuído ao responsável indicado.", { exact: true })).toBeVisible();
+}
+
+async function neutralOwnerConsole(page) {
+  await expect(page.locator(".app-shell.platform-admin")).toBeVisible();
+  await expect(page.locator(".sidebar .brand-tag")).toHaveText("ADMIN");
+  await expect(page.locator(".sidebar")).toHaveCSS("background-color", "rgb(16, 45, 50)");
+  await expect(page.getByRole("button", { name: "Clubes da plataforma", exact: true })).toBeVisible();
+  for (const name of ["O meu clube", "Identidade visual", "Pessoas e convites"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
+  }
+  await expect(page.getByRole("heading", { name: "O seu clube ainda não foi atribuído.", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Clube ativo", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".sidebar-club")).toHaveCount(0);
+  await expect(page.locator(".assigned-club-name")).toHaveCount(0);
+  await expect(page.getByLabel("Código do convite", { exact: true })).toHaveCount(0);
 }
 
 async function publishedMenu(page, primary, secondary) {
@@ -125,11 +140,29 @@ async function publishedMenu(page, primary, secondary) {
     await expect(manager.getByRole("button", { name: "Criar clube", exact: true })).toHaveCount(0);
     await expect(manager.getByRole("button", { name: "Administração", exact: true })).toHaveCount(0);
     bootstrapOwner(emails[0]);
+    const ownerTenantQueries = [];
+    ownerPage.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/v1/clubs") ownerTenantQueries.push(request.url());
+    });
     await ownerPage.reload();
+    await neutralOwnerConsole(ownerPage);
+    await ownerPage.getByRole("button", { name: "A minha conta", exact: true }).click();
+    await expect(ownerPage.getByRole("heading", { name: "A minha conta", level: 1, exact: true })).toBeVisible();
+    await neutralOwnerConsole(ownerPage);
     await provision(ownerPage, clubAName, emails[1]);
     await provision(ownerPage, clubBName, emails[2]);
+    await neutralOwnerConsole(ownerPage);
+    await secondManager.reload();
+    await secondManager.getByRole("button", { name: "Identidade visual", exact: true }).click();
+    await secondManager.getByLabel("Principal", { exact: true }).fill("#dc2626");
+    await secondManager.getByLabel("Secundária", { exact: true }).fill("#facc15");
+    await secondManager.getByRole("button", { name: "Guardar e publicar", exact: true }).click();
+    await expect(secondManager.getByText("Identidade publicada. A nova versão está disponível.", { exact: true })).toBeVisible();
+    await publishedMenu(secondManager, "#dc2626", "#facc15");
+    await ownerPage.reload();
+    await neutralOwnerConsole(ownerPage);
     await ownerPage.screenshot({ path: path.join(results, "owner-admin.png"), fullPage: true });
-    console.log("PASS browser: verified accounts, explicit owner bootstrap and owner-only club provisioning");
+    console.log("PASS browser: separate neutral platform administration provisions client managers without adopting client branding");
 
     await manager.reload();
     await expect(manager.getByRole("heading", { name: clubAName, level: 2, exact: true })).toBeVisible();
@@ -174,7 +207,11 @@ async function publishedMenu(page, primary, secondary) {
     await publishedMenu(manager, "#134e4a", "#052e2b");
     await manager.evaluate(() => window.scrollTo(0, 0));
     await manager.screenshot({ path: path.join(results, "branding.png"), fullPage: true });
-    console.log("PASS browser: assigned club, expanded keyboard palette, image upload and published-only menu colors including rollback");
+    await ownerPage.reload();
+    await neutralOwnerConsole(ownerPage);
+    await publishedMenu(secondManager, "#dc2626", "#facc15");
+    if (ownerTenantQueries.length) throw Error("Platform admin queried the client-club listing");
+    console.log("PASS browser: assigned client club, expanded keyboard palette and published-only menu colors remain independent from platform admin");
 
     await manager.getByRole("button", { name: "Pessoas e convites", exact: true }).click();
     await manager.getByLabel("Email do destinatário", { exact: true }).fill(emails[3]);

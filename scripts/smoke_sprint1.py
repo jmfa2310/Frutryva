@@ -175,7 +175,18 @@ def run(base, mailpit, owner_binary=None):
     checkpoint("registration, verification and accounts initially without owner privileges or club")
 
     bootstrap_owner(emails[0], owner_binary)
-    require(owner.get("/v1/me")["user"]["isPlatformOwner"], "Explicit bootstrap did not grant platform ownership")
+    owner_user = owner.get("/v1/me")["user"]
+    require(owner_user["isPlatformOwner"], "Explicit bootstrap did not grant platform ownership")
+    require("assignedClubId" not in owner_user, "Platform owner metadata exposed a client-club assignment")
+    before_rejected_create = {club["id"] for club in owner.get("/v1/admin/clubs")["clubs"]}
+    self_managed = owner.post(
+        "/v1/admin/clubs", {"name": "Rejected owner-managed club", "managerEmail": emails[0]}, expected=409
+    )
+    require(self_managed["error"]["code"] == "platform_owner_cannot_manage_club", "A platform owner can become a client manager")
+    require(
+        {club["id"] for club in owner.get("/v1/admin/clubs")["clubs"]} == before_rejected_create,
+        "Rejected owner assignment left a partially created club",
+    )
     for client in (first, second, coach):
         client.get("/v1/admin/clubs", expected=403)
         client.post("/v1/admin/clubs", {"name": "Forbidden club", "managerEmail": emails[1]}, expected=403)
@@ -195,8 +206,13 @@ def run(base, mailpit, owner_binary=None):
     )
     require(duplicate["error"]["code"] == "user_has_club", "Duplicate user assignment was not explicitly rejected")
     owner.post(admin_b + "/assign", {"email": emails[1]}, expected=409)
+    rejected_owner = owner.post(admin_a + "/assign", {"email": emails[0]}, expected=409)
+    require(rejected_owner["error"]["code"] == "platform_owner_cannot_manage_club", "Administrative assignment allowed a platform owner as manager")
     owner.get(a, expected=(403, 404))
     require(owner.get("/v1/clubs")["clubs"] == [], "Platform owner received implicit private membership")
+    owner.get(a + "/branding/draft", expected=404)
+    owner.post(a + "/branding/publish", expected=404)
+    owner.get(a + "/members", expected=404)
     for client, club in ((first, club_a), (second, club_b)):
         require(client.get("/v1/me")["user"]["assignedClubId"] == club["id"], "Assignment is missing from the current user")
         require(
@@ -239,6 +255,19 @@ def run(base, mailpit, owner_binary=None):
     require(anonymous.get(public_a)["club"]["branding"] == theme_a, "Rollback did not restore the theme")
     require(len(first.get(a + "/branding/versions")["versions"]) == 3, "Publication history was not retained")
     checkpoint("explicit publication, draft isolation and versioned rollback")
+
+    owner_invitation = first.post(a + "/invitations", {"email": emails[0], "role": "coach"}, 201)["invitation"]
+    owner_invitation_code = inbox.token(emails[0])
+    rejected_owner_invite = owner.post("/v1/invitations/accept", {"token": owner_invitation_code}, expected=409)
+    require(rejected_owner_invite["error"]["code"] == "platform_owner_cannot_manage_club", "Platform owner accepted a client invitation")
+    retained_owner_invite = next(
+        item for item in first.get(a + "/invitations")["invitations"] if item["id"] == owner_invitation["id"]
+    )
+    require(retained_owner_invite["acceptedAt"] is None, "Rejected owner invitation was consumed")
+    require(owner.get("/v1/clubs")["clubs"] == [], "Invitation gave the platform owner client access")
+    require("assignedClubId" not in owner.get("/v1/me")["user"], "Invitation assigned a client club to the owner")
+    first.request("DELETE", a + "/invitations/" + owner_invitation["id"], expected=204)
+    checkpoint("platform owner remains separate from client clubs, assignments and invitations")
 
     conflicting = first.post(a + "/invitations", {"email": emails[2], "role": "coach"}, 201)["invitation"]
     conflicting_code = inbox.token(emails[2])

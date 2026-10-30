@@ -177,45 +177,85 @@ describe('clube único atribuído pela plataforma', () => {
 describe('dono da plataforma', () => {
   it('cria e atribui pelo painel reservado sem criar clube pessoal', async () => {
     const user = userEvent.setup();
-    const assigned = { id: clubA.id, name: clubA.name, shortName: clubA.shortName, manager: { id: manager.id, email: manager.email, displayName: manager.displayName } };
+    const assigned = { id: clubA.id, name: clubA.name, shortName: clubA.shortName, manager: { id: 'client-2', email: 'client@example.invalid', displayName: 'Rui Cliente' } };
     let clubs: typeof assigned[] = [];
     const fetcher = server((path, init) => {
       if (path === '/v1/me') return json({ user: { ...manager, assignedClubId: undefined, isPlatformOwner: true } });
-      if (path === '/v1/clubs') return json({ clubs: [] });
       if (path === '/v1/admin/clubs' && init?.method === 'POST') { clubs = [assigned]; return json({ club: assigned }, 201); }
       if (path === '/v1/admin/clubs') return json({ clubs });
       throw new Error('unexpected request');
     });
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'Administração' }));
     const form = await screen.findByRole('form', { name: 'Criar e atribuir clube' });
     await user.type(within(form).getByLabelText('Nome do novo clube'), clubA.name);
-    await user.type(within(form).getByLabelText('Email do responsável'), manager.email);
+    await user.type(within(form).getByLabelText('Email do responsável'), assigned.manager.email);
     await user.click(within(form).getByRole('button', { name: 'Criar e atribuir clube' }));
     expect(await screen.findByText('Clube criado e atribuído ao responsável indicado.')).toBeVisible();
     expect(screen.getByRole('heading', { name: clubA.name })).toBeVisible();
     const create = fetcher.mock.calls.find(([path, init]) => path === '/v1/admin/clubs' && init?.method === 'POST');
-    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({ name: clubA.name, managerEmail: manager.email });
-    expect(fetcher.mock.calls.some(([path, init]) => path === '/v1/clubs' && init?.method === 'POST')).toBe(false);
+    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({ name: clubA.name, managerEmail: assigned.manager.email });
+    expect(fetcher.mock.calls.some(([path]) => path === '/v1/clubs')).toBe(false);
   });
 
   it('explica a recusa de atribuir outro clube a uma conta já atribuída', async () => {
     const user = userEvent.setup();
     server((path, init) => {
       if (path === '/v1/me') return json({ user: { ...manager, isPlatformOwner: true } });
-      if (path === '/v1/clubs') return json({ clubs: [clubA] });
       if (path === '/v1/admin/clubs' && init?.method === 'POST') return json({ error: { code: 'user_has_club' } }, 409);
       if (path === '/v1/admin/clubs') return json({ clubs: [] });
       throw new Error('unexpected request');
     });
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'Administração' }));
     const form = await screen.findByRole('form', { name: 'Criar e atribuir clube' });
     await user.type(within(form).getByLabelText('Nome do novo clube'), 'Outro clube');
     await user.type(within(form).getByLabelText('Email do responsável'), manager.email);
     await user.click(within(form).getByRole('button', { name: 'Criar e atribuir clube' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Esta conta já tem um clube atribuído.');
     expect(screen.getByLabelText('Nome do novo clube')).toHaveValue('Outro clube');
+  });
+
+  it('mantém administração neutra e separada mesmo com atribuição antiga na sessão', async () => {
+    const user = userEvent.setup();
+    const fetcher = server(path => {
+      if (path === '/v1/me') return json({ user: { ...manager, isPlatformOwner: true, assignedClubId: clubA.id } });
+      if (path === '/v1/admin/clubs') return json({ clubs: [{ id: clubA.id, name: clubA.name, shortName: clubA.shortName, manager: null }] });
+      if (path === '/v1/clubs') return json({ clubs: [{ ...clubA, branding: { ...defaultTheme, primaryColor: '#AA1100', secondaryColor: '#EE1100' }, brandingVersion: 1 }] });
+      throw new Error('Admin must never query tenant routes: ' + path);
+    });
+    const { container } = render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Clubes da plataforma', level: 1 })).toBeVisible();
+    expect(await screen.findByRole('form', { name: 'Atribuir Clube Azul' })).toBeVisible();
+    expect(screen.getByText('ADMIN', { exact: true })).toBeVisible();
+    expect(document.title).toBe('FUTRYVA Admin');
+    expect(screen.queryByText('MANAGER', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'O meu clube' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Identidade visual' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pessoas e convites' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verificar atribuição' })).not.toBeInTheDocument();
+    const shell = container.querySelector<HTMLElement>('.platform-admin')!;
+    expect(shell).not.toHaveAttribute('style');
+    expect(shell.querySelector('.sidebar-club')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'A minha conta' }));
+    expect(await screen.findByRole('button', { name: 'Renovar sessão' })).toBeVisible();
+    expect(screen.queryByLabelText('Código do convite')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cada conta tem um único clube/)).not.toBeInTheDocument();
+    expect(fetcher.mock.calls.every(([path]) => path === '/v1/me' || path === '/v1/admin/clubs')).toBe(true);
+  });
+
+  it('explica que a conta do dono não pode ser atribuída como cliente', async () => {
+    const user = userEvent.setup();
+    server((path, init) => {
+      if (path === '/v1/me') return json({ user: { ...manager, isPlatformOwner: true } });
+      if (path === '/v1/admin/clubs' && init?.method === 'POST') return json({ error: { code: 'platform_owner_cannot_manage_club' } }, 409);
+      if (path === '/v1/admin/clubs') return json({ clubs: [] });
+      throw new Error('unexpected request');
+    });
+    render(<App />);
+    const form = await screen.findByRole('form', { name: 'Criar e atribuir clube' });
+    await user.type(within(form).getByLabelText('Nome do novo clube'), 'Clube cliente');
+    await user.type(within(form).getByLabelText('Email do responsável'), manager.email);
+    await user.click(within(form).getByRole('button', { name: 'Criar e atribuir clube' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Indique uma conta de cliente para gerir o clube.');
   });
 });
 

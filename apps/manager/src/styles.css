@@ -403,3 +403,20 @@ p { line-height: 1.65; }
 }
 /* Preview text follows the draft/publication surface, not the light shell. */
 .app-shell .preview-panel .eyebrow, .app-shell .preview-panel .field-hint { color: var(--club-text); opacity: 1; }
+
+/* The platform owner always uses FUTRYVA's fixed identity, never a club theme. */
+.app-shell.platform-admin {
+  --platform: #087e74;
+  --platform-hover: #06665f;
+  --platform-button-text: #ffffff;
+  --platform-hover-text: #ffffff;
+  --platform-ink: #087e74;
+  --sidebar: #102d32;
+  --sidebar-text: #e6f2ef;
+  --sidebar-muted: #c8dbd7;
+  --sidebar-active: #27524f;
+  --sidebar-active-text: #b7f9df;
+  --sidebar-line: #2e4a4e;
+  --sidebar-avatar: #315452;
+  --sidebar-avatar-text: #d6f5e8;
+}
