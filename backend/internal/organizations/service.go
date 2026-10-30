@@ -50,7 +50,8 @@ const clubSelect = `SELECT c.id::text,c.name,COALESCE(c.short_name,''),
  ORDER BY CASE m.role WHEN 'president' THEN 0 WHEN 'director' THEN 1 WHEN 'coach' THEN 2 ELSE 3 END LIMIT 1),
  v.theme,COALESCE(c.published_branding_version,0)
  FROM clubs c LEFT JOIN club_branding_versions v ON v.club_id=c.id AND v.version=c.published_branding_version
- WHERE c.archived_at IS NULL AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=c.id AND m.user_id=$1)`
+ WHERE c.archived_at IS NULL AND c.id=(SELECT assigned_club_id FROM users WHERE id=$1)
+ AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=c.id AND m.user_id=$1)`
 
 func scanClub(row pgx.Row) (Club, error) {
 	var c Club
@@ -76,6 +77,10 @@ func clubFor(ctx context.Context, q queryer, userID, clubID string, lock bool) (
 }
 func manager(role string) bool { return role == "president" || role == "director" }
 func (s *Service) Mount(mux *http.ServeMux) {
+	mux.HandleFunc("GET /v1/admin/clubs", s.auth.Require(s.adminClubs))
+	mux.HandleFunc("POST /v1/admin/clubs", s.auth.Require(s.adminCreateClub))
+	mux.HandleFunc("POST /v1/admin/clubs/{clubId}/assign", s.auth.Require(s.adminAssign))
+	mux.HandleFunc("DELETE /v1/admin/clubs/{clubId}", s.auth.Require(s.adminArchive))
 	mux.HandleFunc("GET /v1/clubs", s.auth.Require(s.listClubs))
 	mux.HandleFunc("POST /v1/clubs", s.auth.Require(s.createClub))
 	mux.HandleFunc("GET /v1/clubs/{clubId}", s.auth.Require(s.getClub))
@@ -262,53 +267,10 @@ func (s *Service) getClub(w http.ResponseWriter, r *http.Request, u identity.Use
 		jsonResponse(w, 200, map[string]any{"club": c})
 	}
 }
+
+// Club provisioning belongs exclusively to the explicit platform-owner API.
 func (s *Service) createClub(w http.ResponseWriter, r *http.Request, u identity.User) {
-	if !verified(w, u) {
-		return
-	}
-	var in struct {
-		Name      string `json:"name"`
-		ShortName string `json:"shortName"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	in.Name = strings.TrimSpace(in.Name)
-	in.ShortName = strings.TrimSpace(in.ShortName)
-	if !names(in.Name, in.ShortName) {
-		fail(w, 400, "invalid_request", "Club name must have 2–120 characters and short name at most 30")
-		return
-	}
-	tx, err := s.db.Begin(r.Context())
-	if err != nil {
-		dbError(w, err)
-		return
-	}
-	defer tx.Rollback(context.Background())
-	id := newID()
-	if _, err = tx.Exec(r.Context(), `INSERT INTO clubs(id,name,short_name) VALUES($1,$2,$3)`, id, in.Name, in.ShortName); err != nil {
-		dbError(w, err)
-		return
-	}
-	if _, err = tx.Exec(r.Context(), `INSERT INTO club_memberships(club_id,user_id,role) VALUES($1,$2,'president')`, id, u.ID); err != nil {
-		dbError(w, err)
-		return
-	}
-	data, _ := json.Marshal(DefaultTheme())
-	if _, err = tx.Exec(r.Context(), `INSERT INTO club_branding_drafts(club_id,theme) VALUES($1,$2)`, id, data); err != nil {
-		dbError(w, err)
-		return
-	}
-	c, err := clubFor(r.Context(), tx, u.ID, id, false)
-	if err != nil {
-		dbError(w, err)
-		return
-	}
-	if err = tx.Commit(r.Context()); err != nil {
-		dbError(w, err)
-		return
-	}
-	jsonResponse(w, 201, map[string]any{"club": c})
+	fail(w, 403, "platform_owner_required", "Club accounts are provisioned by the platform owner")
 }
 func (s *Service) updateClub(w http.ResponseWriter, r *http.Request, u identity.User) {
 	var in struct {
@@ -345,22 +307,5 @@ func (s *Service) updateClub(w http.ResponseWriter, r *http.Request, u identity.
 	jsonResponse(w, 200, map[string]any{"club": c})
 }
 func (s *Service) archiveClub(w http.ResponseWriter, r *http.Request, u identity.User) {
-	tx, c, ok := s.transaction(w, r, u)
-	if !ok {
-		return
-	}
-	defer tx.Rollback(context.Background())
-	if c.Role != "president" {
-		fail(w, 403, "forbidden", "Only the president may archive a club")
-		return
-	}
-	if _, err := tx.Exec(r.Context(), `UPDATE clubs SET archived_at=now() WHERE id=$1`, c.ID); err != nil {
-		dbError(w, err)
-		return
-	}
-	if err := tx.Commit(r.Context()); err != nil {
-		dbError(w, err)
-		return
-	}
-	jsonResponse(w, 204, nil)
+	fail(w, 403, "platform_owner_required", "Only the platform owner can archive a club")
 }

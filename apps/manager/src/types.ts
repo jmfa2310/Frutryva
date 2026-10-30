@@ -1,4 +1,4 @@
-export type User = { id: string; email: string; displayName: string; emailVerified: boolean };
+export type User = { id: string; email: string; displayName: string; emailVerified: boolean; isPlatformOwner?: boolean; assignedClubId?: string };
 export type Sponsor = { name: string; url: string };
 export type Theme = {
   primaryColor: string; secondaryColor: string; accentColor: string;
@@ -14,6 +14,10 @@ export type Member = { userId: string; displayName: string; email: string; role:
 export type Invitation = {
   id: string; email: string; role: string; expiresAt: string;
   acceptedAt: string | null; revokedAt: string | null;
+};
+export type PlatformClub = {
+  id: string; name: string; shortName: string;
+  manager: { id: string; email: string; displayName: string } | null;
 };
 
 export const defaultTheme: Theme = {

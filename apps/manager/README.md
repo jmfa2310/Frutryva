@@ -1,6 +1,6 @@
 # FUTRYVA Manager
 
-O teste de navegador completo está em `e2e/smoke.cjs`. Com o Compose iniciado, executar `npm ci`, `npx playwright install chromium` e `npm run test:e2e`. Cria contas e clubes sintéticos e usa a caixa Mailpit local; não executar contra produção. `MANAGER_TEST_URL` e `MAILPIT_TEST_URL` permitem alterar os endereços. Em ambientes com Chromium do sistema, definir `CHROMIUM_PATH` para esse executável. As capturas em `test-results/` são ignoradas pelo Git.
+O teste de navegador completo está em `e2e/smoke.cjs`. Com o Compose iniciado, executar `npm ci`, `npx playwright install chromium` e `E2E_BOOTSTRAP_OWNER=1 npm run test:e2e`. Promove explicitamente apenas o dono sintético pelo CLI local e cria contas e clubes sintéticos e usa a caixa Mailpit local; não executar contra produção. `MANAGER_TEST_URL` e `MAILPIT_TEST_URL` permitem alterar os endereços. Em ambientes com Chromium do sistema, definir `CHROMIUM_PATH` para esse executável. As capturas em `test-results/` são ignoradas pelo Git.
 
 Interface React/TypeScript da Sprint 1. Inclui registo/login, confirmação de email, recuperação de palavra-passe, conta/sessão, clubes, branding em rascunho, pré-visualização, publicação e histórico, membros e convites. Não inclui equipas, atletas, editor de treino, loja ou administração SaaS.
 

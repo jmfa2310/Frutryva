@@ -1,5 +1,7 @@
 # Sprint 1 — identidade, clubes e Manager
 
+**Atualização de 30 outubro 2026:** a criação livre e a seleção de múltiplos clubes descritas nesta entrega original foram substituídas pelo [clube único atribuído pelo dono](12_CLUBE_ATRIBUIDO.md). O menu acompanha as cores publicadas. A validação abaixo corresponde à primeira entrega, de 29 outubro.
+
 ## Âmbito implementado
 
 A Sprint 1 acrescenta um fluxo local integrado: criar conta, confirmar email, entrar, recuperar acesso, criar/alternar clubes, preparar identidade visual e publicá-la, convidar utilizadores e aceitar convites por email. A primeira interface é Manager React/TypeScript; a API e PostgreSQL mantêm a fundação e as modalidades da Sprint 0.

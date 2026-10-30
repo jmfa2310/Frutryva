@@ -27,10 +27,42 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "owner" {
+		if len(os.Args) != 4 || os.Args[2] != "set" {
+			logger.Error("Use: /futryva owner set EMAIL_DA_CONTA_CONFIRMADA")
+			os.Exit(1)
+		}
+		if err := setOwner(os.Args[3]); err != nil {
+			logger.Error("Nao foi possivel configurar o dono da plataforma", "reason", err.Error())
+			os.Exit(1)
+		}
+		logger.Info("Conta configurada como dona da plataforma. Volte a abrir o Manager para ver Administracao.")
+		return
+	}
 	if err := run(logger); err != nil {
 		logger.Error("API stopped", "reason", err.Error())
 		os.Exit(1)
 	}
+}
+
+// setOwner is deliberately a local operator command, never a registration or
+// HTTP privilege escalation path. The account must already verify its email.
+func setOwner(email string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.StartupTimeout)
+	defer cancel()
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return errors.New("invalid PostgreSQL configuration")
+	}
+	defer db.Close()
+	if err := migrate.Apply(ctx, db, cfg.MigrationsDir); err != nil {
+		return errors.New("database migrations failed")
+	}
+	return organizations.SetPlatformOwner(ctx, db, email)
 }
 
 // healthcheck is used by Docker without a shell, curl or database secrets.

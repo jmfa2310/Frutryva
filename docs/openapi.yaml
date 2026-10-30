@@ -1,17 +1,18 @@
 openapi: 3.1.0
 info:
   title: FUTRYVA API — Sprint 1
-  version: 0.2.0
-  description: API de desenvolvimento multiclube. Cookies HttpOnly, JSON e escritas
-    da mesma origem. SMTP é Mailpit local; não é uma configuração comercial. Sessões/códigos
-    brutos nunca são devolvidos em JSON. Listas atuais têm limite 100 sem cursor; paginação
-    cursor é evolução futura.
+  version: 0.3.0
+  description: API de desenvolvimento com um único clube atribuído por conta. Só o
+    dono da plataforma cria, atribui e arquiva clubes; não obtém acesso privado automático.
+    Cookies HttpOnly, JSON e escritas da mesma origem. SMTP é Mailpit local, não uma
+    configuração comercial. Listas administrativas têm limite100 sem cursor.
 security:
 - cookieAuth: []
 tags:
 - name: Fundação
 - name: Identidade
 - name: Clubes
+- name: Administração da plataforma
 paths:
   /:
     get:
@@ -330,7 +331,7 @@ paths:
   /v1/clubs:
     get:
       operationId: listClubs
-      summary: Listar clubes da conta
+      summary: Consultar o único clube atribuído à conta
       tags:
       - Clubes
       responses:
@@ -344,38 +345,29 @@ paths:
           $ref: '#/components/responses/401'
         '500':
           $ref: '#/components/responses/500'
-      description: Máximo 100 clubes; um clube por pertença efetiva. Não inclui clubes
-        arquivados.
+      description: 'Devolve zero ou um clube: exige atribuição users.assigned_club_id
+        e pertença ao mesmo clube. Não inclui clubes arquivados. Histórico de pertenças
+        antigas não confere acesso adicional.'
     post:
-      operationId: createClub
-      summary: Criar clube e pertença de presidente
+      operationId: rejectSelfServiceClubCreation
+      summary: Rota de criação self-service desativada
       tags:
       - Clubes
-      responses:
-        '201':
-          description: Operação concluída
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubResponse'
-        '400':
-          $ref: '#/components/responses/400'
-        '401':
-          $ref: '#/components/responses/401'
-        '403':
-          $ref: '#/components/responses/403'
-        '415':
-          $ref: '#/components/responses/415'
-        '500':
-          $ref: '#/components/responses/500'
-      description: Exige email verificado. Cria rascunho inicial; branding público
-        começa null/versão0.
+      description: Devolve403 platform_owner_required a qualquer conta autenticada,
+        incluindo dono da plataforma. A criação é feita exclusivamente em POST /v1/admin/clubs.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ClubInput'
+      responses:
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '415':
+          $ref: '#/components/responses/415'
   /v1/clubs/{clubId}:
     get:
       operationId: getClub
@@ -398,8 +390,9 @@ paths:
         '500':
           $ref: '#/components/responses/500'
       parameters:
-      - &id001
-        $ref: '#/components/parameters/clubId'
+      - $ref: '#/components/parameters/clubId'
+      description: A conta tem de estar atribuída a este clube e ter uma pertença.
+        Conhecer um UUID ou possuir apenas uma pertença histórica não confere acesso.
     patch:
       operationId: updateClub
       summary: Alterar nome do clube
@@ -433,27 +426,21 @@ paths:
             schema:
               $ref: '#/components/schemas/ClubInput'
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
     delete:
-      operationId: archiveClub
-      summary: Arquivar clube sem eliminar dados
+      operationId: rejectMemberClubArchive
+      summary: Rota de arquivo por membros desativada
       tags:
       - Clubes
+      description: Devolve403 platform_owner_required a qualquer conta autenticada.
+        O arquivo é exclusivo de DELETE /v1/admin/clubs/{clubId}.
+      parameters:
+      - $ref: '#/components/parameters/clubId'
       responses:
-        '204':
-          description: Sem conteúdo
         '401':
           $ref: '#/components/responses/401'
         '403':
           $ref: '#/components/responses/403'
-        '404':
-          $ref: '#/components/responses/404'
-        '500':
-          $ref: '#/components/responses/500'
-      description: Só presidente com email verificado. O clube arquivado deixa de
-        surgir em consultas privadas/públicas.
-      parameters:
-      - *id001
   /v1/clubs/{clubId}/branding/draft:
     get:
       operationId: getBrandingDraft
@@ -477,7 +464,7 @@ paths:
           $ref: '#/components/responses/500'
       description: Só presidente/diretor; o rascunho nunca integra o endpoint público.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
     put:
       operationId: saveBrandingDraft
       summary: Guardar rascunho validado
@@ -502,7 +489,8 @@ paths:
           $ref: '#/components/responses/404'
         '500':
           $ref: '#/components/responses/500'
-      description: Só presidente/diretor verificado. Corpo até 1 MiB. Guardar não publica.
+      description: Só presidente/diretor verificado. Corpo até 1 MiB. Guardar não
+        publica.
       requestBody:
         required: true
         content:
@@ -510,7 +498,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ThemeInput'
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/branding/publish:
     post:
       operationId: publishBranding
@@ -545,7 +533,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Empty'
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/branding/versions:
     get:
       operationId: listBrandingVersions
@@ -569,7 +557,7 @@ paths:
           $ref: '#/components/responses/500'
       description: Só presidente/diretor. Até 100 versões, mais recentes primeiro.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/branding/rollback:
     post:
       operationId: rollbackBranding
@@ -604,7 +592,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RollbackInput'
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/members:
     get:
       operationId: listMembers
@@ -628,7 +616,7 @@ paths:
           $ref: '#/components/responses/500'
       description: Só presidente/diretor. Até 100 registos; emails não são públicos.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/invitations:
     get:
       operationId: listInvitations
@@ -653,7 +641,7 @@ paths:
       description: Só presidente/diretor. Até 100 convites recentes. Não devolve o
         código nem o hash.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
     post:
       operationId: inviteMember
       summary: Convidar treinador, assistente ou diretor
@@ -693,7 +681,7 @@ paths:
             schema:
               $ref: '#/components/schemas/InviteInput'
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
   /v1/clubs/{clubId}/invitations/{invitationId}:
     delete:
       operationId: revokeInvitation
@@ -714,7 +702,7 @@ paths:
       description: Presidente/diretor verificado; convites de diretor apenas pelo
         presidente. Não elimina o registo.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
       - $ref: '#/components/parameters/invitationId'
   /v1/invitations/accept:
     post:
@@ -739,9 +727,13 @@ paths:
           $ref: '#/components/responses/415'
         '500':
           $ref: '#/components/responses/500'
+        '409':
+          $ref: '#/components/responses/409'
       description: Conta autenticada e email verificado igual ao destinatário. Código
-        inválido/expirado/revogado/repetido ou de outro email dá 400 genérico. Uma
-        aceitação acrescenta pertença, sem alterar outras pertenças.
+        inválido/expirado/revogado/repetido ou de outro email dá400 genérico. Conta
+        atribuída a outro clube dá409 user_has_club sem consumir o convite. Conta
+        sem clube ou atribuída ao mesmo clube pode aceitar; não recebe acesso a um
+        segundo clube.
       requestBody:
         required: true
         content:
@@ -769,15 +761,132 @@ paths:
       description: 404 antes da primeira publicação ou depois do arquivo. Não devolve
         rascunho, membros nem convites.
       parameters:
-      - *id001
+      - $ref: '#/components/parameters/clubId'
+  /v1/admin/clubs:
+    get:
+      operationId: adminListClubs
+      summary: Listar clubes para atribuição
+      tags:
+      - Administração da plataforma
+      description: Apenas dono da plataforma autenticado e com email verificado. Não
+        concede acesso aos dados privados dos clubes.
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminClubList'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+    post:
+      operationId: adminCreateClub
+      summary: Criar clube e atribuir gestor
+      tags:
+      - Administração da plataforma
+      description: Apenas dono da plataforma. O gestor tem de ser uma conta existente,
+        verificada e sem clube atribuído. O dono não recebe pertença automática. user_has_club
+        ou club_has_manager dão409; a transação rejeitada não cria um clube parcial.
+      responses:
+        '201':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminClubResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '415':
+          $ref: '#/components/responses/415'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminClubInput'
+  /v1/admin/clubs/{clubId}/assign:
+    post:
+      operationId: adminAssignClubManager
+      summary: Atribuir clube a uma conta verificada
+      tags:
+      - Administração da plataforma
+      description: Apenas dono da plataforma. Conta já atribuída a outro clube dá409
+        user_has_club; clube com outro gestor dá409 club_has_manager. Atribuição igual
+        é idempotente. Não existe transferência implícita entre clubes.
+      responses:
+        '200':
+          description: Operação concluída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminClubResponse'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+        '415':
+          $ref: '#/components/responses/415'
+        '500':
+          $ref: '#/components/responses/500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailInput'
+      parameters:
+      - $ref: '#/components/parameters/clubId'
+  /v1/admin/clubs/{clubId}:
+    delete:
+      operationId: adminArchiveClub
+      summary: Arquivar clube sem eliminar dados
+      tags:
+      - Administração da plataforma
+      description: Apenas dono da plataforma. Remove a disponibilidade privada/pública
+        do clube, mantendo registos históricos.
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+      parameters:
+      - $ref: '#/components/parameters/clubId'
 components:
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
       name: futryva_session
-      description: Cookie HttpOnly SameSite=Lax de sessão opaca, revogável e limitada a 24 h.
-        Secure configurável para HTTPS. Browser envia Origin; sem CORS aberto.
+      description: Cookie HttpOnly SameSite=Lax de sessão opaca, revogável e limitada
+        a 24 h. Secure configurável para HTTPS. Browser envia Origin; sem CORS aberto.
   parameters:
     clubId:
       name: clubId
@@ -891,12 +1000,21 @@ components:
           type: string
         emailVerified:
           type: boolean
+        isPlatformOwner:
+          type: boolean
+          description: Privilégio global atribuído apenas pelo CLI administrativo
+            local; não é aceite em registo/login.
+        assignedClubId:
+          type: string
+          format: uuid
+          description: Único clube atribuído; omitido quando a conta aguarda atribuição.
       additionalProperties: false
       required:
       - id
       - email
       - displayName
       - emailVerified
+      - isPlatformOwner
     UserResponse:
       type: object
       properties:
@@ -1079,21 +1197,21 @@ components:
     Club:
       type: object
       properties:
-        id: &id002
+        id:
           type: string
           format: uuid
-        name: &id003
+        name:
           type: string
-        shortName: &id004
+        shortName:
           type: string
-        branding: &id005
+        branding:
           anyOf:
           - $ref: '#/components/schemas/Theme'
           - type: 'null'
-        brandingVersion: &id006
+        brandingVersion:
           type: integer
           minimum: 0
-        archived: &id007
+        archived:
           type: boolean
         role:
           $ref: '#/components/schemas/ClubRole'
@@ -1109,12 +1227,22 @@ components:
     PublicClub:
       type: object
       properties:
-        id: *id002
-        name: *id003
-        shortName: *id004
-        branding: *id005
-        brandingVersion: *id006
-        archived: *id007
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        shortName:
+          type: string
+        branding:
+          anyOf:
+          - $ref: '#/components/schemas/Theme'
+          - type: 'null'
+        brandingVersion:
+          type: integer
+          minimum: 0
+        archived:
+          type: boolean
       additionalProperties: false
       required:
       - id
@@ -1148,7 +1276,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Club'
-          maxItems: 100
+          maxItems: 1
       additionalProperties: false
       required:
       - clubs
@@ -1259,12 +1387,16 @@ components:
         expiresAt:
           type: string
           format: date-time
-        acceptedAt: &id008
+        acceptedAt:
           type:
           - string
           - 'null'
           format: date-time
-        revokedAt: *id008
+        revokedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
       additionalProperties: false
       required:
       - id
@@ -1356,3 +1488,73 @@ components:
       - stage
       - sports
       - health
+    PlatformManager:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          $ref: '#/components/schemas/Email'
+        displayName:
+          type: string
+      required:
+      - id
+      - email
+      - displayName
+      additionalProperties: false
+    AdminClub:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        shortName:
+          type: string
+        manager:
+          anyOf:
+          - $ref: '#/components/schemas/PlatformManager'
+          - type: 'null'
+      required:
+      - id
+      - name
+      - shortName
+      - manager
+      additionalProperties: false
+    AdminClubList:
+      type: object
+      properties:
+        clubs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminClub'
+          maxItems: 100
+      required:
+      - clubs
+      additionalProperties: false
+    AdminClubResponse:
+      type: object
+      properties:
+        club:
+          $ref: '#/components/schemas/AdminClub'
+      required:
+      - club
+      additionalProperties: false
+    AdminClubInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        shortName:
+          type: string
+          maxLength: 30
+        managerEmail:
+          $ref: '#/components/schemas/Email'
+      required:
+      - name
+      - managerEmail
+      additionalProperties: false

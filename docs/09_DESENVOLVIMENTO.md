@@ -52,7 +52,7 @@ Com o Compose saudável:
 
 ```sh
 python3 scripts/smoke.py http://127.0.0.1:18080
-python3 scripts/smoke_sprint1.py --base-url http://127.0.0.1:18081 --mailpit-url http://127.0.0.1:18025
+python3 scripts/smoke_sprint1.py --bootstrap-owner --base-url http://127.0.0.1:18081 --mailpit-url http://127.0.0.1:18025
 ```
 
 O smoke Sprint 1 usa cookies independentes, emails únicos e Mailpit real; verifica códigos, isolamento, branding, convites, rotação/logout, reset e arquivo. Mantém os registos e mensagens sintéticos. Pode apontar diretamente à API, mantendo Origin igual ao endereço usado. No Windows com Python instalado, substituir `python3` por `py`.

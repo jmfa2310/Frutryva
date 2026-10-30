@@ -335,3 +335,71 @@ p { line-height: 1.65; }
 .auth-panel .auth-brand .brand-name { color: #142b30; }
 .auth-panel .auth-brand .brand-tag { color: #526a66; }
 .auth-story-inner > .muted { display: block; margin-top: 28px; color: #b7cdc8; font-size: .75rem; }
+
+/* Expanded colour controls: scoped to the branding editor. */
+.branding-color-picker { min-width: 0; margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.branding-color-picker > legend { padding: 0; margin-bottom: 8px; }
+.branding-color-picker .swatch-control { width: 100%; box-sizing: border-box; }
+.branding-color-picker .color-value { min-width: 0; }
+.branding-color-picker__toggle { align-self: flex-start; border: 0; border-radius: 5px; background: transparent; color: #245f59; padding: 4px 0; font: inherit; font-size: .76rem; font-weight: 650; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.branding-color-picker__toggle:hover { color: #103b37; }
+.branding-color-picker__palette { min-width: 0; width: 100%; padding: 12px; border: 1px solid #d7e4df; border-radius: 9px; background: #f8fbf9; box-sizing: border-box; }
+.branding-color-picker__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(27px, 1fr)); gap: 7px; margin-bottom: 10px; }
+.branding-color-picker__swatch { display: grid; place-items: center; min-width: 0; width: 100%; height: 31px; margin: 0; padding: 0; border: 1px solid #00000030; border-radius: 6px; box-shadow: inset 0 0 0 1px #ffffff22; font-size: 1.1rem; font-weight: 800; cursor: pointer; transition: transform .12s ease; }
+.branding-color-picker__swatch:hover { transform: translateY(-1px); }
+.branding-color-picker__swatch[aria-pressed="true"] { outline: 2px solid #172e2a; outline-offset: 2px; }
+.branding-color-picker__swatch:focus-visible, .branding-color-picker__toggle:focus-visible { outline: 3px solid #087f8c; outline-offset: 3px; }
+.branding-color-picker__palette > .field-hint { display: block; line-height: 1.5; }
+@media (max-width: 600px) {
+  .branding-color-picker__grid { grid-template-columns: repeat(auto-fit, minmax(30px, 1fr)); }
+  .branding-color-picker__swatch { height: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .branding-color-picker__swatch { transition: none; }
+}
+
+/* The Manager shell follows the assigned club's published theme. */
+.app-shell .sidebar { background: var(--sidebar); color: var(--sidebar-text, #e6f2ef); }
+.app-shell .sidebar .brand-name { color: var(--sidebar-text, #ffffff); }
+.app-shell .sidebar .brand-tag, .app-shell .sidebar .sidebar-caption, .app-shell .sidebar .user-details span { color: var(--sidebar-muted, #a9c1bd); }
+.app-shell .sidebar .nav-button { color: var(--sidebar-text, #c8dbd7); }
+.app-shell .sidebar .nav-button svg { opacity: 1; }
+.app-shell .sidebar .nav-button:hover:not(.active) { background: color-mix(in srgb, var(--sidebar-text, #ffffff) 9%, transparent); }
+.app-shell .sidebar .nav-button.active { background: var(--sidebar-active, #27524f); color: var(--sidebar-active-text, #b7f9df); }
+.app-shell .sidebar .sidebar-foot { border-color: var(--sidebar-line, #2e4a4e); }
+.app-shell .sidebar .sidebar-foot .icon-button { color: var(--sidebar-text, #d2e8df); border-color: var(--sidebar-line, #40615b); }
+.app-shell .sidebar .sidebar-foot .icon-button:hover { background: color-mix(in srgb, var(--sidebar-text, #ffffff) 9%, transparent); }
+.app-shell .sidebar .user-avatar { background: var(--sidebar-avatar, #315452); color: var(--sidebar-avatar-text, #d6f5e8); }
+.app-shell .sidebar :focus-visible { outline-color: var(--sidebar-text, #ffffff); }
+.app-shell .button.primary { color: var(--platform-button-text, #ffffff); }
+.app-shell .button.primary:hover:not(:disabled) { color: var(--platform-hover-text, #ffffff); }
+.app-shell .eyebrow, .app-shell .link-button, .app-shell a { color: var(--platform-ink, #087e74); }
+.sidebar-club { display: flex; align-items: center; gap: 10px; margin: 0 8px 20px; padding: 16px 0; border-top: 1px solid var(--sidebar-line, #2e4a4e); border-bottom: 1px solid var(--sidebar-line, #2e4a4e); min-width: 0; }
+.sidebar-club-logo { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; overflow: hidden; border-radius: 9px; background: var(--sidebar-active, #27524f); color: var(--sidebar-active-text, #ffffff); font-size: .8rem; font-weight: 800; }
+.sidebar-club-logo img { width: 100%; height: 100%; object-fit: contain; }
+.sidebar-club-name { min-width: 0; line-height: 1.4; }
+.sidebar-club-name strong { display: block; overflow-wrap: anywhere; font-size: .79rem; }
+.sidebar-club-name span { display: block; margin-top: 4px; font-size: .7rem; color: var(--sidebar-muted, #a9c1bd); }
+.assigned-club-name { max-width: 260px; font-weight: 650; font-size: .8rem; overflow-wrap: anywhere; }
+.assigned-club-summary { max-width: 600px; margin-bottom: 24px; }
+.assigned-club-summary > .field-hint { padding: 0 24px; }
+.platform-club-list { max-width: 100%; }
+.branding-presets h3 { margin-bottom: 7px; }
+.branding-preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
+.branding-preset { min-width: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 10px; border: 1px solid #cbd8d3; border-radius: 9px; background: #ffffff; color: #243c3d; font-size: .73rem; line-height: 1.35; }
+.branding-preset:hover { border-color: #415b55; background: #f5f9f7; }
+.branding-preset[aria-pressed="true"] { outline: 2px solid #243c3d; outline-offset: 1px; }
+.branding-preset-colors { display: flex; width: 100%; height: 23px; overflow: hidden; border-radius: 5px; border: 1px solid #0000001c; }
+.branding-preset-colors span { flex: 1; }
+@media (max-width: 900px) {
+  .sidebar-club { order: 4; width: 100%; margin: 0; padding: 10px 0 0; border-bottom: 0; }
+  .sidebar-club-logo { width: 32px; height: 32px; flex-basis: 32px; }
+  .sidebar-club-name strong { font-size: .77rem; }
+}
+@media (max-width: 600px) {
+  .branding-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .assigned-club-name { max-width: 100%; }
+  .assigned-club-summary > .field-hint { padding-inline: 21px; }
+}
+/* Preview text follows the draft/publication surface, not the light shell. */
+.app-shell .preview-panel .eyebrow, .app-shell .preview-panel .field-hint { color: var(--club-text); opacity: 1; }

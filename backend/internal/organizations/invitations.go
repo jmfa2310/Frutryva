@@ -33,7 +33,7 @@ func (s *Service) listInvitations(w http.ResponseWriter, r *http.Request, u iden
 	if !ok {
 		return
 	}
-	rows, err := s.db.Query(r.Context(), `SELECT `+invitationFields+` FROM club_invitations i WHERE club_id=$1
+	rows, err := s.db.Query(r.Context(), `SELECT `+invitationFields+` FROM club_invitations i WHERE club_id=$1 AND club_id=(SELECT assigned_club_id FROM users WHERE id=$2)
  AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=i.club_id AND m.user_id=$2 AND m.role IN('president','director')) ORDER BY created_at DESC LIMIT 100`, c.ID, u.ID)
 	if err != nil {
 		dbError(w, err)
@@ -200,6 +200,11 @@ func (s *Service) acceptInvitation(w http.ResponseWriter, r *http.Request, u ide
 		dbError(w, err)
 		return
 	}
+	// Assignment is singular and read under a user lock, after the club lock.
+	if err = assignUser(r.Context(), tx, clubID, u.ID, false); err != nil {
+		assignmentError(w, err)
+		return
+	}
 	if _, err = tx.Exec(r.Context(), `INSERT INTO club_memberships(club_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, clubID, u.ID, role); err != nil {
 		dbError(w, err)
 		return
@@ -210,6 +215,10 @@ func (s *Service) acceptInvitation(w http.ResponseWriter, r *http.Request, u ide
 	}
 	c, err := clubFor(r.Context(), tx, u.ID, clubID, false)
 	if err != nil {
+		dbError(w, err)
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `INSERT INTO platform_events(actor_id,action,club_id,target_user_id) VALUES($1,'invitation_accepted',$2,$1)`, u.ID, clubID); err != nil {
 		dbError(w, err)
 		return
 	}

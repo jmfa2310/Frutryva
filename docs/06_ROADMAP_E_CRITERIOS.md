@@ -4,7 +4,7 @@
 Repositório privado, README, AGENTS.md, convenções, `.env.example`, lint, testes, CI, Docker Compose, migrações e seed. Verificar build e health; não apagar volumes/dados.
 
 ## Sprint 1 — Identidade e clubes
-Registo/login/recuperação, sessões, roles e memberships, convites, CRUD de clube, rascunho e publicação de branding. Aceitação: dois clubes com cores/emblemas diferentes, utilizador alterna sem fuga de dados; convite expira; testes automáticos.
+Registo/login/recuperação, sessões, roles e memberships, convites, CRUD de clube, rascunho e publicação de branding. Aceitação: dono cria/atribui clubes, cada utilizador tem apenas o seu clube, dois utilizadores com cores/emblemas distintos não acedem ao clube do outro; convite expira; testes automáticos.
 
 ## Sprint 2 — Modalidades e equipas
 Cinco modalidades, variantes, épocas, equipas, plantéis e treinadores. Aceitação: clube cria futebol, futsal, voleibol, basquetebol e andebol e atribui treinadores com permissões distintas.

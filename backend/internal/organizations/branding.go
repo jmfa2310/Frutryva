@@ -16,7 +16,7 @@ func draftFor(ctx context.Context, q queryer, userID, clubID string) (Theme, err
  'primaryColor',trim(c.primary_color),'secondaryColor',trim(c.secondary_color),'accentColor',trim(c.accent_color),
  'surfaceColor','#07172B','textColor','#FFFFFF','logoUrl',COALESCE(c.logo_url,''),'coverUrl',COALESCE(c.cover_url,''),
  'sponsors','[]'::jsonb,'kitColors','[]'::jsonb))
- FROM clubs c LEFT JOIN club_branding_drafts d ON d.club_id=c.id WHERE c.id=$1 AND c.archived_at IS NULL
+ FROM clubs c LEFT JOIN club_branding_drafts d ON d.club_id=c.id WHERE c.id=$1 AND c.archived_at IS NULL AND c.id=(SELECT assigned_club_id FROM users WHERE id=$2)
  AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=c.id AND m.user_id=$2 AND m.role IN('president','director'))`, clubID, userID).Scan(&raw)
 	if err != nil {
 		return Theme{}, err
@@ -117,7 +117,7 @@ func (s *Service) versions(w http.ResponseWriter, r *http.Request, u identity.Us
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `SELECT v.version,v.theme,v.created_at FROM club_branding_versions v
- WHERE v.club_id=$1 AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=v.club_id AND m.user_id=$2 AND m.role IN('president','director')) ORDER BY v.version DESC LIMIT 100`, c.ID, u.ID)
+ WHERE v.club_id=$1 AND v.club_id=(SELECT assigned_club_id FROM users WHERE id=$2) AND EXISTS(SELECT 1 FROM club_memberships m WHERE m.club_id=v.club_id AND m.user_id=$2 AND m.role IN('president','director')) ORDER BY v.version DESC LIMIT 100`, c.ID, u.ID)
 	if err != nil {
 		dbError(w, err)
 		return
@@ -216,7 +216,7 @@ func (s *Service) members(w http.ResponseWriter, r *http.Request, u identity.Use
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `SELECT m.user_id::text,u.display_name,u.email,m.role FROM club_memberships m JOIN users u ON u.id=m.user_id
- WHERE m.club_id=$1 AND EXISTS(SELECT 1 FROM club_memberships mine WHERE mine.club_id=m.club_id AND mine.user_id=$2 AND mine.role IN('president','director')) ORDER BY u.display_name,m.role LIMIT 100`, c.ID, u.ID)
+ WHERE m.club_id=$1 AND u.assigned_club_id=m.club_id AND m.club_id=(SELECT assigned_club_id FROM users WHERE id=$2) AND EXISTS(SELECT 1 FROM club_memberships mine WHERE mine.club_id=m.club_id AND mine.user_id=$2 AND mine.role IN('president','director')) ORDER BY u.display_name,m.role LIMIT 100`, c.ID, u.ID)
 	if err != nil {
 		dbError(w, err)
 		return

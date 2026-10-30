@@ -66,7 +66,7 @@ Start-Process "http://127.0.0.1:18081"
 Start-Process "http://127.0.0.1:18025"
 ```
 
-No Manager: criar conta, consultar o email no Mailpit, copiar o código e confirmar a conta. Criar um clube, editar a identidade visual em rascunho e publicar quando a pré-visualização estiver correta. Para convidar outro utilizador, criar o convite, abrir o email do destinatário e aceitar o código na conta verificada desse email. A recuperação de acesso usa a mesma caixa local. Nenhuma destas mensagens é entregue a destinatários externos.
+No Manager: criar conta, consultar o email no Mailpit, copiar o código e confirmar a conta. O cliente recebe um único clube atribuído pelo dono da plataforma. O dono deve configurar a sua conta como descrito abaixo e usar Administração para criar/atribuir os clubes. O gestor edita a identidade visual em rascunho e publica quando a pré-visualização estiver correta. Para convidar outro utilizador, criar o convite, abrir o email do destinatário e aceitar o código na conta verificada desse email. A recuperação de acesso usa a mesma caixa local. Nenhuma destas mensagens é entregue a destinatários externos.
 
 ## Diagnóstico e portas ocupadas
 
@@ -112,3 +112,15 @@ Set-Location ..\..
 ```
 
 `-race` exige compilador C compatível no Windows; pode ser executado em Linux/WSL ou no CI. Configurar `DATABASE_TEST_URL` numa base exclusiva de testes para ativar a integração. Os testes ignorados não são testes aprovados.
+
+## Configurar o dono da plataforma
+
+Na pasta da instalação existente, após atualizar e confirmar o email dessa conta:
+
+```powershell
+docker compose exec api /futryva owner set "EMAIL_DA_TUA_CONTA"
+```
+
+Substituir o argumento pelo email com que se registou. Não usar a palavra-passe nesse comando. Atualizar a página do Manager para aparecer Administração. É um comando local de operador, não uma opção disponível no registo.
+
+Contas com um único clube anterior conservam esse clube; a navegação passa a usar as cores publicadas. Contas legadas com várias associações aguardam a escolha do dono, sem apagar dados. Ver [clube atribuído](12_CLUBE_ATRIBUIDO.md).

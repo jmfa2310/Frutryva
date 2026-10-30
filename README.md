@@ -6,8 +6,8 @@
 
 - API modular Go e PostgreSQL 16, migrações versionadas e catálogo de cinco modalidades/sete variantes.
 - Registo, login, confirmação de email, recuperação de acesso, sessões revogáveis e rotação da sessão. Passwords com bcrypt; códigos e sessões guardados como hashes.
-- Clubes com pertenças e papéis por utilizador, alteração de nome e arquivo lógico. Cada pedido privado valida a pertença ao clube no servidor.
-- Identidade visual por clube: rascunho, pré-visualização, publicação e reversão com histórico. Cores, emblema, capa, patrocinadores e cores de equipamento; conteúdo público apenas após publicação.
+- Clubes criados e atribuídos pelo dono da plataforma. Cada utilizador do Manager tem um único clube; todos os pedidos privados validam a atribuição e a pertença. Alteração de nome pelos gestores e arquivo pelo dono.
+- Identidade visual por clube: rascunho, pré-visualização, publicação e reversão com histórico. Paleta de cores e combinações prontas, emblema, capa, patrocinadores e equipamento. O menu e os botões acompanham as cores publicadas do clube; o rascunho não altera a navegação.
 - Convites por email, com validade e uso único; aceitação pela conta verificada do destinatário. Presidente/direção gerem convites e membros; treinadores não gerem o branding.
 - Interface Manager React/TypeScript e caixa de email **local** Mailpit para testar os fluxos completos.
 
@@ -32,7 +32,7 @@ Portas de desenvolvimento, publicadas apenas em loopback:
 
 O PostgreSQL permanece na rede interna do Compose. A API usa 8080 dentro do container; não é necessário ocupar a porta 8080 do Windows. Se outra aplicação usar uma das portas publicadas, alterar a variável correspondente no `.env` e repetir o arranque.
 
-No Manager, criar conta e abrir a caixa Mailpit para copiar o código de confirmação recebido. Voltar ao Manager, confirmar o email e criar o primeiro clube. A mesma caixa recebe códigos de recuperação de acesso e convites; os emails não são enviados para a Internet.
+No Manager, criar conta e abrir a caixa Mailpit para copiar o código de confirmação recebido. Voltar ao Manager e confirmar o email. O dono da plataforma cria e atribui o clube na área Administração; uma conta sem atribuição aguarda o responsável. A mesma caixa recebe códigos de recuperação de acesso e convites; os emails não são enviados para a Internet.
 
 Para instalação ou atualização preservando a base existente, seguir [Windows/PowerShell](docs/07_INSTALACAO_WINDOWS.md).
 
@@ -61,10 +61,20 @@ Com os serviços saudáveis, estes comandos fazem pedidos reais:
 
 ```sh
 python3 scripts/smoke.py http://127.0.0.1:18080
-python3 scripts/smoke_sprint1.py --base-url http://127.0.0.1:18081 --mailpit-url http://127.0.0.1:18025
+python3 scripts/smoke_sprint1.py --bootstrap-owner --base-url http://127.0.0.1:18081 --mailpit-url http://127.0.0.1:18025
 ```
 
-O smoke da Sprint 1 cria contas, clubes e emails sintéticos retidos. Executar numa instalação de desenvolvimento/testes. Ver [desenvolvimento](docs/09_DESENVOLVIMENTO.md), [entrega Sprint 1](docs/11_SPRINT1.md) e [OpenAPI](docs/openapi.yaml). Os documentos de produto descrevem também requisitos futuros; a presença na documentação não significa implementação.
+O smoke da Sprint 1 cria contas, clubes e emails sintéticos retidos. Executar numa instalação de desenvolvimento/testes. Ver [desenvolvimento](docs/09_DESENVOLVIMENTO.md), [entrega Sprint 1](docs/11_SPRINT1.md) e [clube atribuído e cores](docs/12_CLUBE_ATRIBUIDO.md) e [OpenAPI](docs/openapi.yaml). Os documentos de produto descrevem também requisitos futuros; a presença na documentação não significa implementação.
+
+## Conta do dono da plataforma
+
+Após registar e confirmar o email do dono, promover explicitamente essa conta no ambiente local:
+
+```sh
+docker compose exec api /futryva owner set EMAIL_DA_CONTA_CONFIRMADA
+```
+
+Voltar a abrir o Manager para ver Administração. Um registo normal nunca obtém este privilégio. Clientes existentes com um único clube mantêm a atribuição automaticamente na migração; não é necessário recriar o clube.
 
 ## Próxima entrega
 

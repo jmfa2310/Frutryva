@@ -77,7 +77,8 @@ jobs:
             if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then
               python3 ../scripts/smoke.py http://127.0.0.1:8080
               python3 ../scripts/smoke_sprint1.py \
-                --base-url http://127.0.0.1:8080 --mailpit-url http://127.0.0.1:18025
+                --base-url http://127.0.0.1:8080 --mailpit-url http://127.0.0.1:18025 \
+                --owner-binary "$RUNNER_TEMP/futryva"
               exit $?
             fi
             if ! kill -0 "$api_pid" 2>/dev/null; then

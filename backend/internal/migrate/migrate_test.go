@@ -250,8 +250,8 @@ func TestUpgradeToSprintOnePreservesLegacyClubAndUser(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if scalar(t, ctx, db, `SELECT count(*) FROM schema_migrations`) != 2 {
-		t.Fatal("expected two recorded migrations")
+	if scalar(t, ctx, db, `SELECT count(*) FROM schema_migrations`) != 3 {
+		t.Fatal("expected three recorded migrations")
 	}
 	if scalar(t, ctx, db, `SELECT count(*) FROM users WHERE email='legacy@example.invalid' AND email_verified_at IS NULL`) != 1 {
 		t.Fatal("legacy user not preserved")

@@ -15,7 +15,7 @@ Plataforma SaaS multiclube e multidesporto para treinadores, dirigentes, adeptos
 ## Requisitos transversais inegociáveis
 1. Clube configura emblema, cores, imagens, patrocinadores e equipamentos, com pré-visualização, publicação e reversão; nenhum fork de código por clube.
 2. Identidade visual da marca da plataforma separada da identidade de cada clube; verificar contraste e acessibilidade.
-3. Utilizador único com múltiplos clubes, papéis e equipas; treinador pode existir sem clube.
+3. Cada utilizador do Manager tem um único clube atribuído pelo dono da plataforma. A plataforma mantém vários clubes isolados, mas não há seleção de múltiplos clubes pelo utilizador. Uma conta pode aguardar atribuição. Regra revista a pedido do utilizador em 30 outubro 2026.
 4. Dados privados isolados por clube; conteúdo público publicado explicitamente.
 5. Mesma definição de exercício animado pode ser reproduzida em 2D e 3D.
 6. Regras, campos e estatísticas por modalidade, sem pressupor que tudo é futebol.
